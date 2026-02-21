@@ -2,7 +2,7 @@ const express = require('express');
 
 const app = express();
 
-const server = express.Router();
+const server = ex
 
 const PORT = 5001;
 app.listen(PORT, () => {
