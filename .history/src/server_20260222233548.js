@@ -4,7 +4,7 @@ import { connectDB, disconnectDB } from './config/db.js';
 import { error } from 'console';
 
 
-import authRoutes from './Routes/authRoutes.js';
+
 
 const app = express();
 
