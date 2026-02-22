@@ -211,11 +211,11 @@ model QuestionBank {
   id String @id @default(uuid())
   degreeId String @map("degree_id")
   questionText String @map("question_text")
-  optionA String @map("option_a")
-  optionB String @map("option_b") 
-  optionC String @map("option_c")
-  optionD String @map("option_d")
-  correctAnswer String @map("correct_answer")
+  optionA String @map("option_a") @db.VarChar(500)
+  optionB String @map("option_b") @db.VarChar(500)
+  optionC String @map("option_c") @db.VarChar(500)
+  optionD String @map("option_d") @db.VarChar(500)
+  correctAnswer String @map("correct_answer") @db.Char(1)
   
   createdAt DateTime @default(now()) @map("created_at")
   
@@ -227,7 +227,7 @@ model QuestionBank {
 }
 
 model TestResult {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   applicationId String @unique @map("application_id")
   status TestStatus @default(in_progress)
   startTime DateTime? @map("start_time")
@@ -246,9 +246,9 @@ model TestResult {
 }
 
 model CandidateAnswer {
-  id String @id @default(uuid())
-  testResultId String @map("test_result_id")
-  questionId String @map("question_id")
+  id Int @id @default(autoincrement())
+  testResultId Int @map("test_result_id")
+  questionId Int @map("question_id")
   selectedOption String? @map("selected_option") @db.Char(1)
   isFlagged Boolean @default(false) @map("is_flagged")
   isCorrect Boolean? @map("is_correct")
@@ -264,7 +264,7 @@ model CandidateAnswer {
 }
 
 model Ranking {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   applicationId String @unique @map("application_id")
   degreeId String @map("degree_id")
   intakeId String @map("intake_id")
