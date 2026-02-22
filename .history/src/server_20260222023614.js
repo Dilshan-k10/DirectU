@@ -35,9 +35,4 @@ process.on("uncaughtException", async (error) => {
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully...");
   server.close(async () => {
-    await disconnectDB();
-    console.log("Server closed and database disconnected. Exiting process.");
-    process.exit(0);
-  });
-});
 

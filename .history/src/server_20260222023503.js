@@ -28,16 +28,4 @@ process.on("unhandledRejection", async (error) => {
 
 process.on("uncaughtException", async (error) => {
   console.error("Uncaught Exception:", error);
-  await disconnectDB();
-  process.exit(1);
-});
-
-process.on("SIGTERM", async () => {
-  console.log("SIGTERM received, shutting down gracefully...");
-  server.close(async () => {
-    await disconnectDB();
-    console.log("Server closed and database disconnected. Exiting process.");
-    process.exit(0);
-  });
-});
 
