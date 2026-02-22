@@ -3,15 +3,12 @@ import { config } from 'dotenv';
 import { connectDB, disconnectDB } from './config/db.js';  
 import { error } from 'console';
 
-
-import authRoutes from './Routes/authRoutes.js';
-
 const app = express();
 
 const server = express.Router();
 
 // API routes
-app.use("/auth", authRoutes);
+app.use("/auth", )
 
 config();
 connectDB();
