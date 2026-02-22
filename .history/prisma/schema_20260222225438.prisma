@@ -264,7 +264,7 @@ model CandidateAnswer {
 }
 
 model Ranking {
-  id String @id @default(uuid())
+  id Int @id @default(autoincrement())
   applicationId String @unique @map("application_id")
   degreeId String @map("degree_id")
   intakeId String @map("intake_id")

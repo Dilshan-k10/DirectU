@@ -32,7 +32,6 @@ model Degree{
   description String?
   level DegreeLevel @default(BACHELOR)
   duration Int
-  capacity Int @default(50)
   isActive Boolean @default(true)
   createdBy String
 
@@ -42,9 +41,6 @@ model Degree{
   creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   qualificationCriteria QualificationCriteria[]
   applications Application[]
-  alternativePrograms AlternativeProgram[]
-  questionBank QuestionBank[]
-  rankings Ranking[]
 }
 
 enum DegreeLevel {
@@ -96,8 +92,6 @@ model Application {
   intake Intake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
   cvAnalysisResult CVAnalysisResult?
   candidateFeedback CandidateFeedback[]
-  testResult TestResult?
-  ranking Ranking?
 
   @@map("applications")
 }
@@ -117,13 +111,12 @@ model Intake {
   id String @id @default(uuid())
   name String @map("intake_name")
   year Int
-  startDate DateTime? @map("start_date") @db.Date
-  endDate DateTime? @map("end_date") @db.Date
+  startDate DateTime? @map("start_date")
+  endDate DateTime? @map("end_date") 
   
   createdAt DateTime @default(now()) @map("created_at")
   
   applications Application[]
-  rankings Ranking[]
 
   @@map("intakes")
 }
@@ -162,8 +155,6 @@ model CandidateFeedback {
   createdAt DateTime @default(now()) @map("created_at")
   
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  alternativePrograms AlternativeProgram[]
-  improvementSteps ImprovementStep[]
 
   @@map("candidate_feedback")
 }
@@ -171,129 +162,9 @@ model CandidateFeedback {
 enum FeedbackType {
   qualified
   not_qualified
-  over_qualified
+  over_q`
   needs_improvement
 }
-
-model AlternativeProgram {
-  id String @id @default(uuid())
-  feedbackId String @map("feedback_id")
-  programId String @map("program_id")
-  reason String? @map("reason")
-  matchScore Decimal? @map("match_score")
-  
-  feedback CandidateFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
-  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@map("alternative_programs")
-}
-
-model ImprovementStep {
-  id String @id @default(uuid())
-  feedbackId String @map("feedback_id")
-  stepTitle String @map("step_title") @db.VarChar(255)
-  description String @map("description")
-  priority Priority
-  estimatedDuration String? @map("estimated_duration")
-  
-  feedback CandidateFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
-
-  @@map("improvement_steps")
-}
-
-enum Priority {
-  high
-  medium
-  low
-}
-
-model QuestionBank {
-  id String @id @default(uuid())
-  degreeId String @map("degree_id")
-  questionText String @map("question_text")
-  optionA String @map("option_a")
-  optionB String @map("option_b") 
-  optionC String @map("option_c")
-  optionD String @map("option_d")
-  correctAnswer String @map("correct_answer")
-  
-  createdAt DateTime @default(now()) @map("created_at")
-  
-  degree Degree @relation(fields: [degreeId], references: [id])
-  candidateAnswers CandidateAnswer[]
-
-  @@index([degreeId], map: "idx_question_bank_degree")
-  @@map("question_bank")
-}
-
-model TestResult {
-  id String @id @default(uuid())
-  applicationId String @unique @map("application_id")
-  status TestStatus @default(in_progress)
-  startTime DateTime? @map("start_time")
-  endTime DateTime? @map("end_time")
-  score Int?
-  obtainedMarks Int? @map("obtained_marks")
-  percentage Decimal? @db.Decimal(5, 2)
-  
-  createdAt DateTime @default(now()) @map("created_at")
-  
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  candidateAnswers CandidateAnswer[]
-
-  @@index([applicationId], map: "idx_test_results_application")
-  @@map("test_results")
-}
-
-model CandidateAnswer {
-  id String @id @default(uuid())
-  testResultId String @map("test_result_id")
-  questionId String @map("question_id")
-  selectedOption String? @map("selected_option") @db.Char(1)
-  isFlagged Boolean @default(false) @map("is_flagged")
-  isCorrect Boolean? @map("is_correct")
-  
-  createdAt DateTime @default(now()) @map("created_at")
-  
-  testResult TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
-  question QuestionBank @relation(fields: [questionId], references: [id])
-
-  @@unique([testResultId, questionId])
-  @@index([testResultId], map: "idx_candidate_answers_test")
-  @@map("candidate_answers")
-}
-
-model Ranking {
-  id String @id @default(uuid())
-  applicationId String @unique @map("application_id")
-  degreeId String @map("degree_id")
-  intakeId String @map("intake_id")
-  rank Int
-  status RankingStatus?
-  
-  createdAt DateTime @default(now()) @map("created_at")
-  
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  degree Degree @relation(fields: [degreeId], references: [id])
-  intake Intake @relation(fields: [intakeId], references: [id])
-
-  @@index([degreeId, intakeId], map: "idx_rankings_degree_intake")
-  @@index([rank], map: "idx_rankings_rank")
-  @@map("rankings")
-}
-
-enum TestStatus {
-  in_progress
-  completed
-}
-
-enum RankingStatus {
-  accepted
-  rejected
-}
-
-
-
 
 
 
