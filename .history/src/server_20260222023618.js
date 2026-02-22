@@ -39,5 +39,5 @@ process.on("SIGTERM", async () => {
     console.log("Server closed and database disconnected. Exiting process.");
     process.exit(0);
   });
-});
+}
 
