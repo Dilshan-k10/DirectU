@@ -2,8 +2,8 @@ import express from 'express';
 import { config } from 'dotenv';
 import { connectDB, disconnectDB } from './config/db.js';  
 import { error } from 'console';
-
 import authRoutes from './Routes/authRoutes.js';
+import uniadminRoutes from './Routes/uniadminRoutes.js';
 
 const app = express();
 const server = express.Router();
@@ -14,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // API routes
 app.use("/auth", authRoutes);
+app.use("/uniadmin", uniadminRoutes);
 
 config();
 connectDB();
