@@ -106,4 +106,108 @@ export {
   createIntake,
   getIntakes,
 };
+const getApplicants = async (req, res) => {
+  const applicantions = await prisma.application.findMany({
+    include: {
+      candidate: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      program: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      intake: {
+        select: {
+          id: true,
+          name: true,
+          year: true,
+          startDate: true,
+          endDate: true,
+        },
+      },
+      testResult: {
+        select: {
+          id: true,
+          status: true,
+          score: true,
+          obtainedMarks: true,
+          percentage: true,
+        },
+      },
+    },
+    orderBy: {
+      appliedAt: 'desc',
+    },
+  });
+
+  const applicants = applications.map((application) => ({
+    applicationId: application.id,
+    status: application.status,
+    appliedAt: application.appliedAt,
+    documentPath: application.documentPath,
+    documentType: application.documentType,
+    candidate: application.candidate,
+    degree: application.program,
+    intake: application.intake,
+    exam: application.testResult
+      ? {
+          status: application.testResult.status,
+          score: application.testResult.score,
+          obtainedMarks: application.testResult.obtainedMarks,
+          percentage: application.testResult.percentage,
+        }
+      : null,
+  }));  
+
+  return res.status(200).json({
+    status: 'success',
+    data: {
+      applicants,
+    },
+  });
+};
+
+
+const getApplicantDetail = async (req, res) => {
+  const { applicationId } = req.params;
+
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: {
+      candidate: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      program: true,
+      intake: true,
+      cvAnalysisResult: true,
+      testResult: {
+        include: {
+          candidateAnswers: {
+            include: {
+              question: true,
+            },
+          },
+        },
+      }
+    },  
+  });
+
+  if (!application) {
+    return res.status(404).json({
+      error: 'Application not found',
+    });
+  }
+
+  
+}
 
