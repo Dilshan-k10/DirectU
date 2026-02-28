@@ -208,6 +208,67 @@ const getApplicantDetail = async (req, res) => {
     });
   }
 
-  
-}
+  const testResult = application.testResult;
+
+  let question = [];
+
+  if (testResult) {
+    question = testResult.candidateAnswers.map((answer) => ({
+      answerId: answer.id,
+      questionId: answer.questionId,
+      questionText: answer.question.questionText,
+      options:{
+        A: answer.question.optionA,
+        B: answer.question.optionB,
+        C: answer.question.optionC,
+        D: answer.question.optionD,
+      },
+      selectedOption: answer.selectedOption,
+      correctAnswer: answer.question.correctAnswer,
+      isCorrect: answer.isCorrect,
+      isFlagged: answer.isFlagged,
+    }));
+  }
+
+  return res.status(200).json({
+    status: 'success',
+    data: {
+      application: {
+        id: application.id,
+        status: application.status,
+        appliedAt: application.appliedAt,
+        documentPath: application.documentPath,
+        documentType: application.documentType,
+      },
+      candidate: application.candidate,
+      degree:{
+        id: application.program.id,
+        name: application.program.name,
+      },
+      intake: {
+        id: application.intake.id,
+        name: application.intake.name,
+        year: application.intake.year,
+        startDate: application.intake.startDate,
+        endDate: application.intake.endDate,
+      },
+      cv: {
+        documentPath: application.documentpath,
+        analysis: application.cvAnalysisResult,
+      },
+      exam: testResult
+        ? {
+            id: testResult.id,
+            status: testResult.status,
+            startTime: testResult.startTime,
+            endTime: testResult.endTime,
+            score: testResult.score,
+            obtainedMarks: testResult.obtainedMarks,
+            percentage: testResult.percentage,
+            questions,
+        }
+      : null,
+    },
+  });
+};
 
