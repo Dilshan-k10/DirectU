@@ -272,3 +272,29 @@ const getApplicantDetail = async (req, res) => {
   });
 };
 
+const createIntake = async (req, res) => {
+  const { name, year, startDate, endDate } = req.body;
+
+  if (!name || !year || !startDate || !endDate) {
+    return res.status(400).json({
+      error: 'name, year, startDate and endDate are required',
+    });
+  }
+
+  const intake = await prisma.intake.create({
+    data: {
+      name,
+      year: Number(year),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+    },
+  });
+
+  return res.status(201).json({
+    status: 'success',
+    message: 'Intake created successfully',
+    data: {
+      intake,
+    },
+  });
+};
