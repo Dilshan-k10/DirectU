@@ -14,7 +14,7 @@ const router = express.Router();
 // All routes require authentication and ADMIN role
 router.use(protect, authorize('admin'));
 
-router.get('/dashboard', getDashboard);
+router.get('/dashboard',protect, authorize('admin') getDashboard);
 
 router.get('/applicants', getApplicants);
 
