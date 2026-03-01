@@ -104,7 +104,7 @@ export {
   getApplicants,
   getApplicantDetail,
   createIntake,
-  // getIntakes,
+  getIntakes,
 };
 const getApplicants = async (req, res) => {
   const applicantions = await prisma.application.findMany({

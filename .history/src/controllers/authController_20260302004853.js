@@ -43,7 +43,7 @@ const register = async (req, res) => {
             role: user.role
         },
         accessToken,
-        refreshToken,
+        refresh
     });
     
 
@@ -88,7 +88,6 @@ const login = async (req, res) => {
         },
         
         accessToken,
-        refreshToken,
     });
 
 

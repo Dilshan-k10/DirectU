@@ -20,7 +20,7 @@ router.get('/applicants/:applicationId', getApplicantDetail);
 
 router.post('/intakes', createIntake);
 
-// router.get('/intakes', getIntakes);
+router.get('/intakes', getIntakes);
 
 export default router;
 

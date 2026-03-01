@@ -5,7 +5,7 @@ import {
   getApplicants,
   getApplicantDetail,
   createIntake,
-  // getIntakes,
+  getIntakes,
 } from '../controllers/uniadminController.js';
 
 const router = express.Router();
@@ -20,7 +20,7 @@ router.get('/applicants/:applicationId', getApplicantDetail);
 
 router.post('/intakes', createIntake);
 
-// router.get('/intakes', getIntakes);
+router.get('/intakes', getIntakes);
 
 export default router;
 
