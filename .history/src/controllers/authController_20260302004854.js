@@ -88,7 +88,6 @@ const login = async (req, res) => {
         },
         
         accessToken,
-        refreshToken,
     });
 
 
