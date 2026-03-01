@@ -1,16 +1,16 @@
 import express from 'express';
 import {
-  uniAdminLogin,
   getDashboard,
   getApplicants,
   getApplicantDetail,
   createIntake,
   getIntakes,
 } from '../controllers/uniadminController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/login', uniAdminLogin);
+router.use(protect);
 
 router.get('/dashboard', getDashboard);
 
@@ -23,4 +23,3 @@ router.post('/intakes', createIntake);
 router.get('/intakes', getIntakes);
 
 export default router;
-
