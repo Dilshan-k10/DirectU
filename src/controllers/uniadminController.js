@@ -1,58 +1,4 @@
 import { prisma } from '../config/db.js';
-import bcrypt from 'bcryptjs';
-import { generateToken } from '../utils/generateToken.js';
-
-const uniAdminLogin = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
-
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-
-  if (!isPasswordValid) {
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
-
-  const emailParts = email.split('@');
-  const domain = emailParts[1]?.toLowerCase();
-  const allowedDomain = process.env.UNIVERSITY_ADMIN_EMAIL_DOMAIN;
-
-  if (!allowedDomain) {
-    return res.status(500).json({
-      error: 'University admin email domain is not configured',
-    });
-  }
-
-  if (!domain || domain !== allowedDomain.toLowerCase()) {
-    return res.status(403).json({
-      error: 'Access restricted to organization email domain for university admins',
-    });
-  }
-
-  const token = generateToken(user.id, res);
-
-  return res.status(200).json({
-    status: 'success',
-    message: 'University admin login successful',
-    data: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
-    token,
-  });
-};
 
 const getDashboard = async (req, res) => {
   const degrees = await prisma.degree.findMany({
@@ -97,17 +43,8 @@ const getDashboard = async (req, res) => {
   });
 };
 
-
-export {
-  uniAdminLogin,
-  getDashboard,
-  getApplicants,
-  getApplicantDetail,
-  createIntake,
-  getIntakes,
-};
 const getApplicants = async (req, res) => {
-  const applicantions = await prisma.application.findMany({
+  const applications = await prisma.application.findMany({
     include: {
       candidate: {
         select: {
@@ -198,8 +135,8 @@ const getApplicantDetail = async (req, res) => {
             },
           },
         },
-      }
-    },  
+      },
+    },
   });
 
   if (!application) {
@@ -210,14 +147,14 @@ const getApplicantDetail = async (req, res) => {
 
   const testResult = application.testResult;
 
-  let question = [];
+  let questions = [];
 
   if (testResult) {
-    question = testResult.candidateAnswers.map((answer) => ({
+    questions = testResult.candidateAnswers.map((answer) => ({
       answerId: answer.id,
       questionId: answer.questionId,
       questionText: answer.question.questionText,
-      options:{
+      options: {
         A: answer.question.optionA,
         B: answer.question.optionB,
         C: answer.question.optionC,
@@ -241,7 +178,7 @@ const getApplicantDetail = async (req, res) => {
         documentType: application.documentType,
       },
       candidate: application.candidate,
-      degree:{
+      degree: {
         id: application.program.id,
         name: application.program.name,
       },
@@ -253,7 +190,7 @@ const getApplicantDetail = async (req, res) => {
         endDate: application.intake.endDate,
       },
       cv: {
-        documentPath: application.documentpath,
+        documentPath: application.documentPath,
         analysis: application.cvAnalysisResult,
       },
       exam: testResult
@@ -266,8 +203,8 @@ const getApplicantDetail = async (req, res) => {
             obtainedMarks: testResult.obtainedMarks,
             percentage: testResult.percentage,
             questions,
-        }
-      : null,
+          }
+        : null,
     },
   });
 };
@@ -297,4 +234,27 @@ const createIntake = async (req, res) => {
       intake,
     },
   });
+};
+
+const getIntakes = async (req, res) => {
+  const intakes = await prisma.intake.findMany({
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    data: {
+      intakes,
+    },
+  });
+};
+
+export {
+  getDashboard,
+  getApplicants,
+  getApplicantDetail,
+  createIntake,
+  getIntakes,
 };
