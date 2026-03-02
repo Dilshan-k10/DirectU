@@ -257,5 +257,127 @@ const submitStudentAnswers = async (req, res) => {
   }
 };
 
-export { getRandomQuestionsByDegree, submitStudentAnswers };
+const calculateFinalScoreAndSave = async (req, res) => {
+  try {
+    const { studentId, degreeId } = req.body;
+
+    if (!studentId || !degreeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'studentId and degreeId are required',
+        data: null,
+      });
+    }
+
+    // Validate student exists
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found',
+        data: null,
+      });
+    }
+
+    // Validate degree exists
+    const degree = await prisma.degree.findUnique({
+      where: { id: degreeId },
+      select: { id: true },
+    });
+
+    if (!degree) {
+      return res.status(404).json({
+        success: false,
+        message: 'Degree not found',
+        data: null,
+      });
+    }
+
+    // Find the student's latest application for this degree
+    const application = await prisma.application.findFirst({
+      where: {
+        candidateId: studentId,
+        programId: degreeId,
+      },
+      orderBy: {
+        appliedAt: 'desc',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found for this student and degree',
+        data: null,
+      });
+    }
+
+    // Fetch test result with all candidate answers
+    const testResult = await prisma.testResult.findUnique({
+      where: { applicationId: application.id },
+      include: {
+        candidateAnswers: {
+          select: {
+            isCorrect: true,
+          },
+        },
+      },
+    });
+
+    if (!testResult || !testResult.candidateAnswers || testResult.candidateAnswers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No submitted answers found for this student and degree',
+        data: null,
+      });
+    }
+
+    // Calculate total score: 10 marks per correct answer
+    let correctCount = 0;
+    for (let i = 0; i < testResult.candidateAnswers.length; i++) {
+      const answer = testResult.candidateAnswers[i];
+      if (answer.isCorrect === true) {
+        correctCount += 1;
+      }
+    }
+
+    const totalScore = correctCount * 10;
+
+    // Save total score using existing attributes (no schema changes)
+    const updatedResult = await prisma.testResult.update({
+      where: { id: testResult.id },
+      data: {
+        obtainedMarks: totalScore,
+      },
+      select: {
+        id: true,
+        obtainedMarks: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Final score calculated and saved successfully',
+      data: {
+        totalScore: updatedResult.obtainedMarks,
+      },
+    });
+  } catch (error) {
+    console.error('Error calculating final score:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to calculate final score',
+      data: null,
+    });
+  }
+};
+
+export { getRandomQuestionsByDegree, submitStudentAnswers, calculateFinalScoreAndSave };
 
