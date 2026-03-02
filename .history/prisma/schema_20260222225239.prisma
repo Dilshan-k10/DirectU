@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("USER")
+
+  createdAt DateTime @default(now())
+  
+  degrees   Degree[]
+  applications Application[]
+}
+
+model Degree{
+  id String @id @default(uuid())
+  name String
+  description String?
+  level DegreeLevel @default(BACHELOR)
+  duration Int
+  capacity Int @default(50)
+  isActive Boolean @default(true)
+  createdBy String
+
+  updatedAt DateTime @default(now())
+  createdAt DateTime @updatedAt
+  
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  qualificationCriteria QualificationCriteria[]
+  applications Application[]
+  alternativePrograms AlternativeProgram[]
+  questionBank QuestionBank[]
+  rankings Ranking[]
+}
+
+enum DegreeLevel {
+  BACHELOR
+  MASTER
+  PHD
+}
+
+model QualificationCriteria {
+  id String @id @default(uuid())
+  programId String @map("program_id")
+  criteriaName String @map("criteria_name")
+  ruleType RuleType @map("rule_type")
+  conditions Json
+  weight Decimal @default(1.0) @db.Decimal(5, 2)
+  isMandatory Boolean @default(true) @map("is_mandatory")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@map("qualification_criteria")
+}
+
+enum RuleType {
+  min_gpa
+  min_experience
+  required_subject
+  required_certification
+  custom
+}
+
+model Application {
+  id String @id @default(uuid())
+  candidateId String @map("candidate_id")
+  programId String @map("program_id")
+  intakeId String @map("intake_id")
+  status ApplicationStatus
+  documentPath String? @map("document_path")
+  documentType String? @map("document_type")
+  reconsiderationLocked Boolean @default(false) @map("reconsideration_locked")
+  
+  appliedAt DateTime @default(now()) @map("applied_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+  intake Intake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  cvAnalysisResult CVAnalysisResult?
+  candidateFeedback CandidateFeedback[]
+  testResult TestResult?
+  ranking Ranking?
+
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  submitted
+  under_review
+  qualified
+  not_qualified
+  test_pending
+  test_completed
+  rejected
+  accepted
+}
+
+model Intake {
+  id String @id @default(uuid())
+  name String @map("intake_name")
+  year Int
+  startDate DateTime? @map("start_date") @db.Date
+  endDate DateTime? @map("end_date") @db.Date
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  applications Application[]
+  rankings Ranking[]
+
+  @@map("intakes")
+}
+
+model CVAnalysisResult {
+  id String @id @default(uuid())
+  applicationId String @unique @map("application_id")
+  extractedData Json @map("extracted_data")
+  qualificationMatch Boolean? @map("qualification_match")
+  confidenceScore Decimal? @map("confidence_score") @db.Decimal(5, 2)
+  analysisStatus AnalysisStatus @map("analysis_status")
+  errorMessage String? @map("error_message")
+  analyzedAt DateTime? @map("analyzed_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("cv_analysis_results")
+}
+
+enum AnalysisStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model CandidateFeedback {
+  id String @id @default(uuid())
+  applicationId String @map("application_id")
+  feedbackType FeedbackType @map("feedback_type")
+  message String 
+  suggestions Json?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  alternativePrograms AlternativeProgram[]
+  improvementSteps ImprovementStep[]
+
+  @@map("candidate_feedback")
+}
+
+enum FeedbackType {
+  qualified
+  not_qualified
+  over_qualified
+  needs_improvement
+}
+
+model AlternativeProgram {
+  id String @id @default(uuid())
+  feedbackId String @map("feedback_id")
+  programId String @map("program_id")
+  reason String? @map("reason")
+  matchScore Decimal? @map("match_score")
+  
+  feedback CandidateFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@map("alternative_programs")
+}
+
+model ImprovementStep {
+  id String @id @default(uuid())
+  feedbackId String @map("feedback_id")
+  stepTitle String @map("step_title") @db.VarChar(255)
+  description String @map("description")
+  priority Priority
+  estimatedDuration String? @map("estimated_duration")
+  
+  feedback CandidateFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+
+  @@map("improvement_steps")
+}
+
+enum Priority {
+  high
+  medium
+  low
+}
+
+model QuestionBank {
+  id String @id @default(uuid())
+  degreeId String @map("degree_id")
+  questionText String @map("question_text") @db.Text
+  optionA String @map("option_a") @db.VarChar(500)
+  optionB String @map("option_b") @db.VarChar(500)
+  optionC String @map("option_c") @db.VarChar(500)
+  optionD String @map("option_d") @db.VarChar(500)
+  correctAnswer String @map("correct_answer") @db.Char(1)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  degree Degree @relation(fields: [degreeId], references: [id])
+  candidateAnswers CandidateAnswer[]
+
+  @@index([degreeId], map: "idx_question_bank_degree")
+  @@map("question_bank")
+}
+
+model TestResult {
+  id Int @id @default(autoincrement())
+  applicationId String @unique @map("application_id")
+  status TestStatus @default(in_progress)
+  startTime DateTime? @map("start_time")
+  endTime DateTime? @map("end_time")
+  score Int?
+  obtainedMarks Int? @map("obtained_marks")
+  percentage Decimal? @db.Decimal(5, 2)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateAnswers CandidateAnswer[]
+
+  @@index([applicationId], map: "idx_test_results_application")
+  @@map("test_results")
+}
+
+model CandidateAnswer {
+  id Int @id @default(autoincrement())
+  testResultId Int @map("test_result_id")
+  questionId Int @map("question_id")
+  selectedOption String? @map("selected_option") @db.Char(1)
+  isFlagged Boolean @default(false) @map("is_flagged")
+  isCorrect Boolean? @map("is_correct")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  testResult TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  question QuestionBank @relation(fields: [questionId], references: [id])
+
+  @@unique([testResultId, questionId])
+  @@index([testResultId], map: "idx_candidate_answers_test")
+  @@map("candidate_answers")
+}
+
+model Ranking {
+  id Int @id @default(autoincrement())
+  applicationId String @unique @map("application_id")
+  degreeId String @map("degree_id")
+  intakeId String @map("intake_id")
+  rank Int
+  status RankingStatus?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  degree Degree @relation(fields: [degreeId], references: [id])
+  intake Intake @relation(fields: [intakeId], references: [id])
+
+  @@index([degreeId, intakeId], map: "idx_rankings_degree_intake")
+  @@index([rank], map: "idx_rankings_rank")
+  @@map("rankings")
+}
+
+enum TestStatus {
+  in_progress
+  completed
+}
+
+enum RankingStatus {
+  accepted
+  rejected
+}
+
+
+
+
+
+

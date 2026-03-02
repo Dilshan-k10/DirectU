@@ -1,0 +1,170 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("USER")
+
+  createdAt DateTime @default(now())
+  
+  degrees   Degree[]
+  applications Application[]
+}
+
+model Degree{
+  id String @id @default(uuid())
+  name String
+  description String?
+  level DegreeLevel @default(BACHELOR)
+  duration Int
+  isActive Boolean @default(true)
+  createdBy String
+
+  updatedAt DateTime @default(now())
+  createdAt DateTime @updatedAt
+  
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  qualificationCriteria QualificationCriteria[]
+  applications Application[]
+}
+
+enum DegreeLevel {
+  BACHELOR
+  MASTER
+  PHD
+}
+
+model QualificationCriteria {
+  id String @id @default(uuid())
+  programId String @map("program_id")
+  criteriaName String @map("criteria_name")
+  ruleType RuleType @map("rule_type")
+  conditions Json
+  weight Decimal @default(1.0) @db.Decimal(5, 2)
+  isMandatory Boolean @default(true) @map("is_mandatory")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@map("qualification_criteria")
+}
+
+enum RuleType {
+  min_gpa
+  min_experience
+  required_subject
+  required_certification
+  custom
+}
+
+model Application {
+  id String @id @default(uuid())
+  candidateId String @map("candidate_id")
+  programId String @map("program_id")
+  intakeId String @map("intake_id")
+  status ApplicationStatus
+  documentPath String? @map("document_path")
+  documentType String? @map("document_type")
+  reconsiderationLocked Boolean @default(false) @map("reconsideration_locked")
+  
+  appliedAt DateTime @default(now()) @map("applied_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+  intake Intake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  cvAnalysisResult CVAnalysisResult?
+  candidateFeedback CandidateFeedback[]
+
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  submitted
+  under_review
+  qualified
+  not_qualified
+  test_pending
+  test_completed
+  rejected
+  accepted
+}
+
+model Intake {
+  id String @id @default(uuid())
+  name String @map("intake_name")
+  year Int
+  startDate DateTime? @map("start_date")
+  endDate DateTime? @map("end_date") 
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  applications Application[]
+
+  @@map("intakes")
+}
+
+model CVAnalysisResult {
+  id String @id @default(uuid())
+  applicationId String @unique @map("application_id")
+  extractedData Json @map("extracted_data")
+  qualificationMatch Boolean? @map("qualification_match")
+  confidenceScore Decimal? @map("confidence_score") @db.Decimal(5, 2)
+  analysisStatus AnalysisStatus @map("analysis_status")
+  errorMessage String? @map("error_message")
+  analyzedAt DateTime? @map("analyzed_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("cv_analysis_results")
+}
+
+enum AnalysisStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model CandidateFeedback {
+  id String @id @default(uuid())
+  applicationId String @map("application_id")
+  feedbackType FeedbackType @map("feedback_type")
+  message String 
+  suggestions Json?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_feedback")
+}
+
+enum FeedbackType {
+  qualified
+  not_qualified
+  over_q
+  needs_improvement
+}
+
+
+

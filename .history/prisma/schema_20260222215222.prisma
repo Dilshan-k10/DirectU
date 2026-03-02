@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("USER")
+
+  createdAt DateTime @default(now())
+  
+  degrees   Degree[]
+  applications Application[]
+}
+
+model Degree{
+  id String @id @default(uuid())
+  name String
+  description String?
+  level DegreeLevel @default(BACHELOR)
+  duration Int
+  isActive Boolean @default(true)
+  createdBy String
+
+  updatedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  qualificationCriteria QualificationCriteria[]
+  applications Application[]
+}
+
+enum DegreeLevel {
+  BACHELOR
+  MASTER
+  PHD
+}
+
+model QualificationCriteria {
+  id String @id @default(uuid())
+  programId String @map("program_id")
+  criteriaName String @map("criteria_name")
+  ruleType RuleType @map("rule_type")
+  conditions Json
+  weight Decimal @default(1.0) @db.Decimal(5, 2)
+  isMandatory Boolean @default(true) @map("is_mandatory")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@map("qualification_criteria")
+}
+
+enum RuleType {
+  min_gpa
+  min_experience
+  required_subject
+  required_certification
+  custom
+}
+
+model Application {
+  id String @id @default(uuid())
+  candidateId String @map("candidate_id")
+  programId String @map("program_id")
+  status ApplicationStatus 
+  reconsiderationLocked Boolean @default(false) @map("reconsideration_locked")
+  
+  appliedAt DateTime @default(now()) @map("applied_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  program Degree @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  submitted
+  under_review
+  qualified
+  not_qualified
+  test_pending
+  test_completed
+  rejected
+  accepted
+}
+
+
+
