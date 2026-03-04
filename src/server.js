@@ -4,6 +4,7 @@ import { connectDB, disconnectDB } from './config/db.js';
 import { error } from 'console';
 import authRoutes from './Routes/authRoutes.js';
 import uniadminRoutes from './Routes/uniadminRoutes.js';
+import evaluationRoutes from './Routes/evaluationRoutes.js';
 
 const app = express();
 const server = express.Router();
@@ -15,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 // API routes
 app.use("/auth", authRoutes);
 app.use("/uniadmin", uniadminRoutes);
+app.use("/evaluation", evaluationRoutes);
 
 config();
 connectDB();
