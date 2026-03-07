@@ -127,15 +127,6 @@ const getApplicantDetail = async (req, res) => {
       program: true,
       intake: true,
       cvAnalysisResult: true,
-      testResult: {
-        include: {
-          candidateAnswers: {
-            include: {
-              question: true,
-            },
-          },
-        },
-      },
     },
   });
 
@@ -143,28 +134,6 @@ const getApplicantDetail = async (req, res) => {
     return res.status(404).json({
       error: 'Application not found',
     });
-  }
-
-  const testResult = application.testResult;
-
-  let questions = [];
-
-  if (testResult) {
-    questions = testResult.candidateAnswers.map((answer) => ({
-      answerId: answer.id,
-      questionId: answer.questionId,
-      questionText: answer.question.questionText,
-      options: {
-        A: answer.question.optionA,
-        B: answer.question.optionB,
-        C: answer.question.optionC,
-        D: answer.question.optionD,
-      },
-      selectedOption: answer.selectedOption,
-      correctAnswer: answer.question.correctAnswer,
-      isCorrect: answer.isCorrect,
-      isFlagged: answer.isFlagged,
-    }));
   }
 
   return res.status(200).json({
@@ -193,18 +162,74 @@ const getApplicantDetail = async (req, res) => {
         documentPath: application.documentPath,
         analysis: application.cvAnalysisResult,
       },
-      exam: testResult
-        ? {
-            id: testResult.id,
-            status: testResult.status,
-            startTime: testResult.startTime,
-            endTime: testResult.endTime,
-            score: testResult.score,
-            obtainedMarks: testResult.obtainedMarks,
-            percentage: testResult.percentage,
-            questions,
-          }
-        : null,
+    },
+  });
+};
+
+const getApplicantExamDetail = async (req, res) => {
+  const { applicationId } = req.params;
+
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: {
+      testResult: {
+        include: {
+          candidateAnswers: {
+            include: {
+              question: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!application) {
+    return res.status(404).json({
+      error: 'Application not found',
+    });
+  }
+
+  const testResult = application.testResult;
+
+  if (!testResult) {
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        exam: null,
+      },
+    });
+  }
+
+  const questions = testResult.candidateAnswers.map((answer) => ({
+    answerId: answer.id,
+    questionId: answer.questionId,
+    questionText: answer.question.questionText,
+    options: {
+      A: answer.question.optionA,
+      B: answer.question.optionB,
+      C: answer.question.optionC,
+      D: answer.question.optionD,
+    },
+    selectedOption: answer.selectedOption,
+    correctAnswer: answer.question.correctAnswer,
+    isCorrect: answer.isCorrect,
+    isFlagged: answer.isFlagged,
+  }));
+
+  return res.status(200).json({
+    status: 'success',
+    data: {
+      exam: {
+        id: testResult.id,
+        status: testResult.status,
+        startTime: testResult.startTime,
+        endTime: testResult.endTime,
+        score: testResult.score,
+        obtainedMarks: testResult.obtainedMarks,
+        percentage: testResult.percentage,
+        questions,
+      },
     },
   });
 };
@@ -236,6 +261,47 @@ const createIntake = async (req, res) => {
   });
 };
 
+const updateIntake = async (req, res) => {
+  const { intakeId } = req.params;
+  const { name, year, startDate, endDate } = req.body;
+
+  if (!name && !year && !startDate && !endDate) {
+    return res.status(400).json({
+      error: 'At least one field (name, year, startDate, endDate) is required to update',
+    });
+  }
+
+  const existingIntake = await prisma.intake.findUnique({
+    where: { id: intakeId },
+  });
+
+  if (!existingIntake) {
+    return res.status(404).json({
+      error: 'Intake not found',
+    });
+  }
+
+  const data = {};
+
+  if (name !== undefined) data.name = name;
+  if (year !== undefined) data.year = Number(year);
+  if (startDate !== undefined) data.startDate = new Date(startDate);
+  if (endDate !== undefined) data.endDate = new Date(endDate);
+
+  const updatedIntake = await prisma.intake.update({
+    where: { id: intakeId },
+    data,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Intake updated successfully',
+    data: {
+      intake: updatedIntake,
+    },
+  });
+};
+
 const getIntakes = async (req, res) => {
   const intakes = await prisma.intake.findMany({
     orderBy: {
@@ -251,10 +317,110 @@ const getIntakes = async (req, res) => {
   });
 };
 
+const createDegree = async (req, res) => {
+  const { name, description, level, duration, capacity, isActive } = req.body;
+
+  if (!name || !level || !duration) {
+    return res.status(400).json({
+      error: 'name, level and duration are required',
+    });
+  }
+
+  const degree = await prisma.degree.create({
+    data: {
+      name,
+      description: description || null,
+      level,
+      duration: Number(duration),
+      capacity: capacity !== undefined ? Number(capacity) : undefined,
+      isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+      createdBy: req.user.id,
+    },
+  });
+
+  return res.status(201).json({
+    status: 'success',
+    message: 'Degree created successfully',
+    data: {
+      degree,
+    },
+  });
+};
+
+const getDegrees = async (req, res) => {
+  const degrees = await prisma.degree.findMany({
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    data: {
+      degrees,
+    },
+  });
+};
+
+const updateDegree = async (req, res) => {
+  const { degreeId } = req.params;
+  const { name, description, level, duration, capacity, isActive } = req.body;
+
+  if (
+    name === undefined &&
+    description === undefined &&
+    level === undefined &&
+    duration === undefined &&
+    capacity === undefined &&
+    isActive === undefined
+  ) {
+    return res.status(400).json({
+      error: 'At least one field must be provided to update the degree',
+    });
+  }
+
+  const existingDegree = await prisma.degree.findUnique({
+    where: { id: degreeId },
+  });
+
+  if (!existingDegree) {
+    return res.status(404).json({
+      error: 'Degree not found',
+    });
+  }
+
+  const data = {};
+
+  if (name !== undefined) data.name = name;
+  if (description !== undefined) data.description = description;
+  if (level !== undefined) data.level = level;
+  if (duration !== undefined) data.duration = Number(duration);
+  if (capacity !== undefined) data.capacity = Number(capacity);
+  if (isActive !== undefined) data.isActive = Boolean(isActive);
+
+  const updatedDegree = await prisma.degree.update({
+    where: { id: degreeId },
+    data,
+  });
+
+  return res.status(200).json({
+    status: 'success',
+    message: 'Degree updated successfully',
+    data: {
+      degree: updatedDegree,
+    },
+  });
+};
+
 export {
   getDashboard,
   getApplicants,
   getApplicantDetail,
+  getApplicantExamDetail,
   createIntake,
+  updateIntake,
   getIntakes,
+  createDegree,
+  getDegrees,
+  updateDegree,
 };
