@@ -379,5 +379,98 @@ const calculateFinalScoreAndSave = async (req, res) => {
   }
 };
 
-export { getRandomQuestionsByDegree, submitStudentAnswers, calculateFinalScoreAndSave };
+
+const getStudentRankings = async (req, res) => {
+  try {
+    // Fetch all completed results that have a stored final score
+    const results = await prisma.testResult.findMany({
+      where: {
+        status: 'completed',
+        obtainedMarks: { not: null },
+      },
+      select: {
+        obtainedMarks: true,
+        application: {
+          select: {
+            candidate: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!results || results.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No exam results found',
+        data: null,
+      });
+    }
+
+    // Reduce to best score per student (dynamic ranking is per student)
+    const bestByStudentId = new Map();
+    for (let i = 0; i < results.length; i++) {
+      const row = results[i];
+      const candidate = row?.application?.candidate;
+      if (!candidate?.id) continue;
+
+      const score = typeof row.obtainedMarks === 'number' ? row.obtainedMarks : 0;
+      const existing = bestByStudentId.get(candidate.id);
+
+      if (!existing || score > existing.score) {
+        bestByStudentId.set(candidate.id, {
+          studentId: candidate.id,
+          name: candidate.name || null,
+          score,
+        });
+      }
+    }
+
+    const rankingList = Array.from(bestByStudentId.values()).sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.studentId).localeCompare(String(b.studentId));
+    });
+
+    // Assign dense ranks (ties share the same rank)
+    let rank = 0;
+    let lastScore = null;
+    const ranked = rankingList.map((entry) => {
+      if (lastScore === null || entry.score !== lastScore) {
+        rank += 1;
+        lastScore = entry.score;
+      }
+
+      return {
+        rank,
+        studentId: entry.studentId,
+        name: entry.name,
+        score: entry.score,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student rankings fetched successfully',
+      data: ranked,
+    });
+  } catch (error) {
+    console.error('Error fetching student rankings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch student rankings',
+      data: null,
+    });
+  }
+};
+
+export {
+  getRandomQuestionsByDegree,
+  submitStudentAnswers,
+  calculateFinalScoreAndSave,
+  getStudentRankings,
+};
 
