@@ -14,7 +14,7 @@ const router = express.Router();
 router.use(protect);
 
 // GET /api/exam/questions/:degreeId
-router.get('/exam/questions/:degreeId', authorize('USER'), getRandomQuestionsByDegree);
+router.get('/questions/:degreeId', authorize('USER'), getRandomQuestionsByDegree);
 
 // POST /api/exam/submit
 router.post('/submit', authorize('USER'), submitStudentAnswers);
