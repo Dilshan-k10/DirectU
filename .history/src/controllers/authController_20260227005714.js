@@ -12,7 +12,7 @@ const register = async (req, res) => {
     });
 
     if (existingUser) {
-        return res.status(400).json({ error: "User already exists with this email" });
+        return res.status(400).json({ error: "User already exists with this email " });
     }
 
     // Hashed password
@@ -31,7 +31,7 @@ const register = async (req, res) => {
     });
 
     // generate JWT token
-    const { accessToken, refreshToken } = generateToken(user.id, user.role, res);
+    const token = generateToken(user.id, res);
     
     res.status(201).json({
         status: "success",
@@ -42,8 +42,7 @@ const register = async (req, res) => {
             email: user.email,
             role: user.role
         },
-        accessToken,
-        refreshToken,
+        token,
     });
     
 
@@ -74,7 +73,7 @@ const login = async (req, res) => {
     }
 
     // generate JWT token
-    const { accessToken, refreshToken } = generateToken(user.id, user.role, res);
+    const token = generateToken(user.id, res);
 
     
     res.status(200).json({
@@ -87,8 +86,7 @@ const login = async (req, res) => {
             role: user.role
         },
         
-        accessToken,
-        refreshToken,
+        token,
     });
 
 
@@ -99,11 +97,7 @@ const login = async (req, res) => {
 const logout = async (req, res) => { 
     res.cookie('jwt', '', {
         httpOnly: true,
-        expires: new Date(0)
-    });
-    res.cookie('refreshToken', '', {
-        httpOnly: true,
-        expires: new Date(0)
+        expires: new Date(0) // Set cookie to expire immediately
     });
     res.status(200).json({
         status: "success",
