@@ -21,8 +21,8 @@ app.use(cookieParser());
 // API routes
 app.use("/auth", authRoutes);
 app.use("/uniadmin", uniadminRoutes);
-app.use("/applications", applicationRoutes);
 app.use("/exam", examRoutes);
+app.use("/application", applicationRoutes);
 
 connectDB();
 

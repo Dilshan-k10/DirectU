@@ -5,6 +5,7 @@ import { connectDB, disconnectDB } from './config/db.js';
 import { error } from 'console';
 import authRoutes from './Routes/authRoutes.js';
 import uniadminRoutes from './Routes/uniadminRoutes.js';
+import applicationRoutes from './Routes/appliactionRoutes.js';
 import examRoutes from './Routes/examRoutes.js';
 import applicationRoutes from './Routes/applicationRoutes.js';
 
