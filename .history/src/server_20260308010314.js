@@ -6,8 +6,6 @@ import { error } from 'console';
 import authRoutes from './Routes/authRoutes.js';
 import uniadminRoutes from './Routes/uniadminRoutes.js';
 import examRoutes from './Routes/examRoutes.js';
-import applicationRoutes from './Routes/applicationRoutes.js';
-import userRoutes from './Routes/userRoutes.js';
 
 const app = express();
 const server = express.Router();
@@ -22,9 +20,8 @@ app.use(cookieParser());
 // API routes
 app.use("/auth", authRoutes);
 app.use("/uniadmin", uniadminRoutes);
-app.use("/applications", applicationRoutes);
 app.use("/exam", examRoutes);
-app.use("/users", userRoutes);
+app.use()
 
 connectDB();
 
