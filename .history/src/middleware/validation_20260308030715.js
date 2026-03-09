@@ -33,7 +33,7 @@ export const validateOwnership = async (req, res, next) => {
 
         if (!application) return res.status(404).json({ error: 'Application not found' });
 
-        if (application.candidate_id !== req.user.id && req.user.role !== 'ADMIN') {
+        if (application.candidate_id !== req.user.id && req.user.rol !== 'admin') {
             return res.status(403).json({ error: 'Access denied' });
         }
         next();
