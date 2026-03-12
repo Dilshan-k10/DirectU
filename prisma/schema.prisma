@@ -222,6 +222,7 @@ model QuestionBank {
 
   degree           Degree            @relation(fields: [degreeId], references: [id])
   candidateAnswers CandidateAnswer[]
+  examQuestionAssignments ExamQuestionAssignment[]
 
   @@index([degreeId], map: "idx_question_bank_degree")
   @@map("question_bank")
@@ -241,9 +242,27 @@ model TestResult {
 
   application      Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   candidateAnswers CandidateAnswer[]
+  examQuestionAssignments ExamQuestionAssignment[]
 
   @@index([applicationId], map: "idx_test_results_application")
   @@map("test_results")
+}
+
+model ExamQuestionAssignment {
+  id           String   @id @default(uuid())
+  testResultId String   @map("test_result_id")
+  questionId   String   @map("question_id")
+  order        Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  testResult TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  question   QuestionBank @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([testResultId, questionId])
+  @@index([testResultId], map: "idx_exam_q_assign_test")
+  @@index([questionId], map: "idx_exam_q_assign_question")
+  @@map("exam_question_assignments")
 }
 
 model CandidateAnswer {
