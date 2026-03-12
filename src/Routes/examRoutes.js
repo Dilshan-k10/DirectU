@@ -5,6 +5,7 @@ import {
   getRandomQuestionsByDegree,
   submitStudentAnswers,
   calculateFinalScoreAndSave,
+  recalculateDegreeRankings,
   getStudentRankings,
 } from '../controllers/examController.js';
 
@@ -24,6 +25,9 @@ router.post('/calculate-score', authorize('USER'), calculateFinalScoreAndSave);
 
 // GET /api/exam/rankings
 router.get('/rankings', authorize('USER'), getStudentRankings);
+
+// POST /api/exam/rankings/recalculate/:degreeId
+router.post('/rankings/recalculate/:degreeId', authorize('ADMIN'), recalculateDegreeRankings);
 
 export default router;
 

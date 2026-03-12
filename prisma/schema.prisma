@@ -253,6 +253,7 @@ model ExamQuestionAssignment {
   testResultId String   @map("test_result_id")
   questionId   String   @map("question_id")
   order        Int?
+  studentId    String?  @map("student_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -262,6 +263,7 @@ model ExamQuestionAssignment {
   @@unique([testResultId, questionId])
   @@index([testResultId], map: "idx_exam_q_assign_test")
   @@index([questionId], map: "idx_exam_q_assign_question")
+  @@index([studentId], map: "idx_exam_q_assign_student")
   @@map("exam_question_assignments")
 }
 
