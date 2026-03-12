@@ -4,9 +4,56 @@ const getRandomQuestionsByDegree = async (req, res) => {
   try {
     const { degreeId } = req.params;
 
-    // Validate that the degree exists
+    // Ensure the request is authenticated and we have a logged-in user
+    const loggedInUserId = req.user?.id;
+    if (!loggedInUserId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated',
+        data: null,
+      });
+    }
+
+    // Find the latest application for this logged-in user and degree
+    const application = await prisma.application.findFirst({
+      where: {
+        candidateId: loggedInUserId,
+        programId: degreeId,
+      },
+      orderBy: {
+        appliedAt: 'desc',
+      },
+      select: {
+        id: true,
+        programId: true,
+        status: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'No application found for this degree for the logged-in user',
+        data: null,
+      });
+    }
+
+    // Only release exam if application status is "qualified"
+    if (application.status !== 'qualified') {
+      return res.status(403).json({
+        success: false,
+        message: 'Exam not available. Application is not qualified',
+        data: {
+          applicationId: application.id,
+          degreeId: application.programId,
+          applicationStatus: application.status,
+        },
+      });
+    }
+
+    // Validate that the degree exists (based on application.programId)
     const degree = await prisma.degree.findUnique({
-      where: { id: degreeId },
+      where: { id: application.programId },
     });
 
     if (!degree) {
@@ -19,7 +66,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
 
     // Fetch all questions related to that degree (exclude correct answers)
     const questions = await prisma.questionBank.findMany({
-      where: { degreeId },
+      where: { degreeId: application.programId },
       select: {
         id: true,
         questionText: true,
@@ -51,7 +98,12 @@ const getRandomQuestionsByDegree = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Random questions fetched successfully',
-      data: randomTen,
+      data: {
+        applicationId: application.id,
+        degreeId: application.programId,
+        applicationStatus: application.status,
+        questions: randomTen,
+      },
     });
   } catch (error) {
     console.error('Error fetching random questions by degree:', error);
