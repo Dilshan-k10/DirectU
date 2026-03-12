@@ -147,12 +147,12 @@ const getRandomQuestionsByDegree = async (req, res) => {
           degreeCode = match[1].toLowerCase();
         }
 
-        // Find the last AI-style question id for this degree: deg_{degreeCode}_{number}
+        // Find the last question id for this degree in format q_{degreeCode}_{number}
         const lastAiQuestion = await prisma.questionBank.findFirst({
           where: {
             degreeId: degree.id,
             id: {
-              startsWith: `deg_${degreeCode}_`,
+              startsWith: `q_${degreeCode}_`,
             },
           },
           select: { id: true },
@@ -169,11 +169,11 @@ const getRandomQuestionsByDegree = async (req, res) => {
           }
         }
 
-        // Create questions with ids: deg_{degreeCode}_{NNN}
+        // Create questions with ids: q_{degreeCode}_{NNN}
         const toCreate = generated.map((q, index) => {
           const nextNumber = lastNumber + index + 1;
           const suffix = String(nextNumber).padStart(3, '0');
-          const questionId = `deg_${degreeCode}_${suffix}`;
+          const questionId = `q_${degreeCode}_${suffix}`;
 
           return {
             id: questionId,
