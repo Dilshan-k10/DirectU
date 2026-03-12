@@ -1,5 +1,6 @@
 import { prisma } from '../config/db.js';
 import { generateMcqsForDegree } from '../services/geminiQuestionService.js';
+import { updateDegreeRanking } from '../services/rankingService.js';
 
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
@@ -235,6 +236,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
         testResultId: testResult.id,
         questionId: q.id,
         order: idx + 1,
+        studentId: loggedInUserId,
       })),
       skipDuplicates: true,
     });
@@ -559,6 +561,13 @@ const calculateFinalScoreAndSave = async (req, res) => {
       },
     });
 
+    // Recalculate rankings for this degree (do not block on failure)
+    try {
+      await updateDegreeRanking(degreeId);
+    } catch (rankErr) {
+      console.error('Ranking update failed:', rankErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Final score calculated and saved successfully',
@@ -576,17 +585,45 @@ const calculateFinalScoreAndSave = async (req, res) => {
   }
 };
 
+const recalculateDegreeRankings = async (req, res) => {
+  try {
+    const { degreeId } = req.params;
+    if (!degreeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'degreeId is required',
+        data: null,
+      });
+    }
+
+    await updateDegreeRanking(degreeId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rankings recalculated successfully',
+      data: null,
+    });
+  } catch (error) {
+    console.error('Error recalculating rankings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to recalculate rankings',
+      data: null,
+    });
+  }
+};
+
 
 const getStudentRankings = async (req, res) => {
   try {
-    // Fetch all completed results that have a stored final score
-    const results = await prisma.testResult.findMany({
-      where: {
-        status: 'completed',
-        obtainedMarks: { not: null },
-      },
+    const { degreeId } = req.query || {};
+
+    const rankings = await prisma.ranking.findMany({
+      where: degreeId ? { degreeId: String(degreeId) } : undefined,
+      orderBy: [{ degreeId: 'asc' }, { rank: 'asc' }],
       select: {
-        obtainedMarks: true,
+        rank: true,
+        degreeId: true,
         application: {
           select: {
             candidate: {
@@ -595,59 +632,34 @@ const getStudentRankings = async (req, res) => {
                 name: true,
               },
             },
+            testResult: {
+              select: {
+                obtainedMarks: true,
+              },
+            },
           },
         },
       },
     });
 
-    if (!results || results.length === 0) {
+    if (!rankings || rankings.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No exam results found',
+        message: 'No rankings found',
         data: null,
       });
     }
 
-    // Reduce to best score per student (dynamic ranking is per student)
-    const bestByStudentId = new Map();
-    for (let i = 0; i < results.length; i++) {
-      const row = results[i];
-      const candidate = row?.application?.candidate;
-      if (!candidate?.id) continue;
-
-      const score = typeof row.obtainedMarks === 'number' ? row.obtainedMarks : 0;
-      const existing = bestByStudentId.get(candidate.id);
-
-      if (!existing || score > existing.score) {
-        bestByStudentId.set(candidate.id, {
-          studentId: candidate.id,
-          name: candidate.name || null,
-          score,
-        });
-      }
-    }
-
-    const rankingList = Array.from(bestByStudentId.values()).sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return String(a.studentId).localeCompare(String(b.studentId));
-    });
-
-    // Assign dense ranks (ties share the same rank)
-    let rank = 0;
-    let lastScore = null;
-    const ranked = rankingList.map((entry) => {
-      if (lastScore === null || entry.score !== lastScore) {
-        rank += 1;
-        lastScore = entry.score;
-      }
-
-      return {
-        rank,
-        studentId: entry.studentId,
-        name: entry.name,
-        score: entry.score,
-      };
-    });
+    const ranked = rankings.map((row) => ({
+      rank: row.rank,
+      degreeId: row.degreeId,
+      studentId: row.application.candidate.id,
+      name: row.application.candidate.name || null,
+      score:
+        typeof row.application.testResult?.obtainedMarks === 'number'
+          ? row.application.testResult.obtainedMarks
+          : 0,
+    }));
 
     return res.status(200).json({
       success: true,
@@ -668,6 +680,7 @@ export {
   getRandomQuestionsByDegree,
   submitStudentAnswers,
   calculateFinalScoreAndSave,
+  recalculateDegreeRankings,
   getStudentRankings,
 };
 
