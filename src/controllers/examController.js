@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { generateMcqsForDegree } from '../services/geminiQuestionService.js';
 
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
@@ -54,6 +55,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
     // Validate that the degree exists (based on application.programId)
     const degree = await prisma.degree.findUnique({
       where: { id: application.programId },
+      select: { id: true, name: true },
     });
 
     if (!degree) {
@@ -64,9 +66,143 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Fetch all questions related to that degree (exclude correct answers)
-    const questions = await prisma.questionBank.findMany({
-      where: { degreeId: application.programId },
+    // Ensure a testResult exists for locking question assignments (Pattern B)
+    let testResult = await prisma.testResult.findUnique({
+      where: { applicationId: application.id },
+      select: { id: true, status: true, startTime: true },
+    });
+
+    if (!testResult) {
+      testResult = await prisma.testResult.create({
+        data: {
+          applicationId: application.id,
+          status: 'in_progress',
+          startTime: new Date(),
+        },
+        select: { id: true, status: true, startTime: true },
+      });
+    } else if (!testResult.startTime) {
+      await prisma.testResult.update({
+        where: { id: testResult.id },
+        data: { startTime: new Date() },
+      });
+    }
+
+    // If questions are already assigned to this testResult, return the locked set
+    const existingAssignments = await prisma.examQuestionAssignment.findMany({
+      where: { testResultId: testResult.id },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        question: {
+          select: {
+            id: true,
+            questionText: true,
+            optionA: true,
+            optionB: true,
+            optionC: true,
+            optionD: true,
+          },
+        },
+      },
+    });
+
+    if (existingAssignments.length === 10) {
+      return res.status(200).json({
+        success: true,
+        message: 'Exam questions fetched successfully',
+        data: {
+          applicationId: application.id,
+          degreeId: degree.id,
+          applicationStatus: application.status,
+          testResultId: testResult.id,
+          questions: existingAssignments.map((a) => a.question),
+        },
+      });
+    }
+
+    // Count how many students have already received locked question sets for this degree
+    const served = await prisma.examQuestionAssignment.findMany({
+      where: {
+        testResult: {
+          application: {
+            programId: degree.id,
+          },
+        },
+      },
+      distinct: ['testResultId'],
+      select: { testResultId: true },
+    });
+    const servedCount = served.length;
+
+    // For the first 20 students per degree, generate new AI questions and store them in QuestionBank
+    if (servedCount < 20) {
+      try {
+        const generated = await generateMcqsForDegree({ degreeName: degree.name });
+
+        // Derive degree code from degree.id, e.g. "deg_bda_001" -> "bda"
+        let degreeCode = 'gen';
+        const match = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
+        if (match && match[1]) {
+          degreeCode = match[1].toLowerCase();
+        }
+
+        // Find the last AI-style question id for this degree: deg_{degreeCode}_{number}
+        const lastAiQuestion = await prisma.questionBank.findFirst({
+          where: {
+            degreeId: degree.id,
+            id: {
+              startsWith: `deg_${degreeCode}_`,
+            },
+          },
+          select: { id: true },
+          orderBy: { id: 'desc' },
+        });
+
+        let lastNumber = 0;
+        if (lastAiQuestion?.id) {
+          const parts = String(lastAiQuestion.id).split('_');
+          const maybeNum = parts[parts.length - 1];
+          const parsed = parseInt(maybeNum, 10);
+          if (!Number.isNaN(parsed)) {
+            lastNumber = parsed;
+          }
+        }
+
+        // Create questions with ids: deg_{degreeCode}_{NNN}
+        const toCreate = generated.map((q, index) => {
+          const nextNumber = lastNumber + index + 1;
+          const suffix = String(nextNumber).padStart(3, '0');
+          const questionId = `deg_${degreeCode}_${suffix}`;
+
+          return {
+            id: questionId,
+            degreeId: degree.id,
+            questionText: q.questionText,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            correctAnswer: q.correctAnswer,
+          };
+        });
+
+        await prisma.questionBank.createMany({
+          data: toCreate,
+          skipDuplicates: true,
+        });
+      } catch (aiError) {
+        console.error('AI question generation failed:', aiError);
+        return res.status(502).json({
+          success: false,
+          message: 'Failed to generate exam questions. Please try again later.',
+          data: null,
+        });
+      }
+    }
+
+    // Fetch pool for this degree (exclude correct answers)
+    const pool = await prisma.questionBank.findMany({
+      where: { degreeId: degree.id },
       select: {
         id: true,
         questionText: true,
@@ -77,8 +213,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    // If less than 10 questions available → validation error
-    if (questions.length < 10) {
+    if (pool.length < 10) {
       return res.status(400).json({
         success: false,
         message:
@@ -87,22 +222,32 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Randomly select EXACTLY 10 questions (Fisher–Yates shuffle in controller)
-    for (let i = questions.length - 1; i > 0; i--) {
+    // Randomly select 10 questions and lock them for this testResult
+    for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [questions[i], questions[j]] = [questions[j], questions[i]];
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const randomTen = questions.slice(0, 10);
+    const chosen = pool.slice(0, 10);
+
+    await prisma.examQuestionAssignment.createMany({
+      data: chosen.map((q, idx) => ({
+        testResultId: testResult.id,
+        questionId: q.id,
+        order: idx + 1,
+      })),
+      skipDuplicates: true,
+    });
 
     return res.status(200).json({
       success: true,
-      message: 'Random questions fetched successfully',
+      message: 'Exam questions fetched successfully',
       data: {
         applicationId: application.id,
-        degreeId: application.programId,
+        degreeId: degree.id,
         applicationStatus: application.status,
-        questions: randomTen,
+        testResultId: testResult.id,
+        questions: chosen,
       },
     });
   } catch (error) {
