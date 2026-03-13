@@ -278,7 +278,7 @@ const submitStudentAnswers = async (req, res) => {
     // 1. Validate student exists
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { id: true },
+      select: { id: true, email: true, name: true },
     });
 
     if (!student) {
