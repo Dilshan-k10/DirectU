@@ -1,6 +1,7 @@
 import { prisma } from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/generateToken.js';
+import { sendWelcomeEmail } from '../services/mailService.js';
 
 
 const register = async (req, res) => { 
@@ -32,6 +33,12 @@ const register = async (req, res) => {
 
     // generate JWT token
     const { accessToken, refreshToken } = generateToken(user.id, user.role, res);
+    
+    try {
+        await sendWelcomeEmail(user.email, user.name || 'User');
+    } catch (error) {
+        console.error('Failed to send welcome email:', error);
+    }
     
     res.status(201).json({
         status: "success",
