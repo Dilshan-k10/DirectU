@@ -117,8 +117,6 @@ def predict_degree(text: str):
     confidence = float(probabilities[predicted_index])
 
     return predicted_degree, confidence
-
-
 GRADE_PATTERN = re.compile(r"\b([ABCS])\b", re.IGNORECASE)
 GRADE_ORDER = ["S", "C", "B", "A"]
 
@@ -229,9 +227,15 @@ def evaluate_qualification_from_criteria(
     extra_achievements = False
 
     for row in criteria_rows:
+        import json
+
         rule_type: str = row["rule_type"]
-        conditions: Dict[str, Any] = row["conditions"]
+        conditions = row["conditions"]
         is_mandatory: bool = row["is_mandatory"]
+
+        # Ensure JSON is a dictionary
+        if isinstance(conditions, str):
+            conditions = json.loads(conditions)
 
         passed = _evaluate_single_rule(rule_type, conditions, features)
 
@@ -247,18 +251,23 @@ def evaluate_qualification_from_criteria(
     return "qualified"
 
 
-def map_predicted_degree_to_program_id(
-    predicted_degree: str, degree_rows: List[asyncpg.Record]
-) -> Optional[str]:
-    """
-    Map the model's predicted degree label to a Degree.id from the database.
-    """
+def map_predicted_degree_to_program_id(predicted_degree, degree_rows):
+
     if not predicted_degree:
         return None
-    target = predicted_degree.strip().lower()
+
+    # normalize model output
+    target = predicted_degree.lower().replace("_", " ").strip()
+
     for row in degree_rows:
-        if row["name"].strip().lower() == target:
+        db_name = row["name"].lower().strip()
+
+        if target == db_name:
             return row["id"]
+
+        if target in db_name or db_name in target:
+            return row["id"]
+
     return None
 
 
@@ -315,12 +324,13 @@ async def analyze(payload: AnalysisRequest, request: Request):
             degree_rows = await conn.fetch(
                 """
                 SELECT id, name
-                FROM degrees
+                FROM "Degree"
                 """
             )
             predicted_program_id = map_predicted_degree_to_program_id(
-                ml_label, degree_rows
+                ml_label.replace("_", " "), degree_rows
             )
+
             confidence = ml_confidence
             similarity_scores: Dict[str, float] = {}
 
@@ -348,6 +358,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
             analysis_id = str(uuid.uuid4())
             analyzed_at = datetime.utcnow()
 
+            import json
             await conn.execute(
                 """
                 INSERT INTO cv_analysis_results (
@@ -369,7 +380,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 """,
                 analysis_id,
                 payload.application_id,
-                features,
+                json.dumps(features),
                 qualification_match,
                 float(round(confidence, 2)),
                 "completed",
@@ -413,12 +424,8 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 None,
             )
 
-            # 8️⃣ Suggest alternative program if under- or overqualified
-            if (
-                qualification_status in ("underqualified", "overqualified")
-                and predicted_program_id
-                and predicted_program_id != selected_program_id
-            ):
+            # 8️⃣ Save predicted program in alternative_programs when it differs from selected
+            if predicted_program_id and predicted_program_id != selected_program_id:
                 alt_id = str(uuid.uuid4())
                 predicted_degree = ml_label
                 reason_parts = [
@@ -430,10 +437,14 @@ async def analyze(payload: AnalysisRequest, request: Request):
                         "You may be better suited for this alternative program "
                         "based on your current qualifications."
                     )
-                else:
+                elif qualification_status == "overqualified":
                     reason_parts.append(
                         "You may be overqualified for the selected program; this "
                         "alternative may be a stronger match."
+                    )
+                else:
+                    reason_parts.append(
+                        "You may also consider this program based on your profile."
                     )
 
                 reason = " ".join(reason_parts)
@@ -458,7 +469,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
 
     # Response payload (semantic prediction + qualification status + similarity scores)
     return AnalysisResponse(
-        predicted_degree=predicted_program_id,
+        predicted_degree=ml_label,
         confidence_score=round(confidence, 2),
         qualification_status=qualification_status,
         qualification_match=qualification_match,
