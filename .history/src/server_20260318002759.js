@@ -10,9 +10,13 @@ import applicationRoutes from './Routes/applicationRoutes.js';
 import userRoutes from './Routes/userRoutes.js';
 import evaluationRoutes from './Routes/evaluationRoutes.js';
 import notificationRoutes from './Routes/notificationRoutes.js';
+
 import cors from "cors";
 
-
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true
+}));
 
 const app = express();
 const server = express.Router();
@@ -23,11 +27,6 @@ config();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}));
 
 // API routes
 app.use("/auth", authRoutes);
