@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { sendEmail } from '../services/mailService.js';
 
 const submitApplication = async (req, res) => {
     try {
@@ -25,6 +26,46 @@ const submitApplication = async (req, res) => {
                 documentType: document.mimetype,
             },
         });
+
+        // If CV evaluation already completed (e.g., via existing external workflow),
+        // send eligibility email without affecting the main submission flow.
+        try {
+            const appForEmail = await prisma.application.findUnique({
+                where: { id: application.id },
+                select: {
+                    candidate: { select: { email: true } },
+                    program: { select: { name: true } },
+                    cvAnalysisResult: {
+                        select: {
+                            analysisStatus: true,
+                            qualificationMatch: true,
+                        },
+                    },
+                },
+            });
+
+            const email = appForEmail?.candidate?.email;
+            const degreeName = appForEmail?.program?.name;
+            const analysis = appForEmail?.cvAnalysisResult;
+
+            if (
+                email &&
+                degreeName &&
+                analysis?.analysisStatus === 'completed' &&
+                analysis.qualificationMatch !== null &&
+                analysis.qualificationMatch !== undefined
+            ) {
+                const suitable = analysis.qualificationMatch === true;
+                const subject = suitable ? 'Application Successful' : 'Application Submitted';
+                const message = suitable
+                    ? `Your application has been submitted successfully. You are eligible for ${degreeName}.`
+                    : `Your application has been submitted successfully, but you are not eligible for ${degreeName}. Please apply for another degree.`;
+
+                await sendEmail(email, subject, message);
+            }
+        } catch (mailErr) {
+            console.error('Failed to send CV eligibility email:', mailErr);
+        }
 
         res.status(201).json({
             status: 'success',
