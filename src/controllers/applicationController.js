@@ -27,6 +27,28 @@ const submitApplication = async (req, res) => {
             },
         });
 
+        // Trigger AI analysis asynchronously (fire-and-forget)
+        (async () => {
+            try {
+                const response = await fetch('http://localhost:8000/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // If AI service requires authentication, add token here
+                        // 'Authorization': `Bearer ${serviceToken}`
+                    },
+                    body: JSON.stringify({ application_id: application.id })
+                });
+                if (!response.ok) {
+                    console.error(`AI service responded with status: ${response.status}`);
+                } else {
+                    console.log('AI analysis triggered successfully');
+                }
+            } catch (error) {
+                console.error('Failed to trigger AI analysis:', error.message);
+            }
+        })();
+
         // If CV evaluation already completed (e.g., via existing external workflow),
         // send eligibility email without affecting the main submission flow.
         try {
