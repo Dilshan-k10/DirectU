@@ -1,17 +1,19 @@
 import express from 'express';
-import { getEvaluation, 
-    reconsiderApplication, 
-    suggestAlternative } from '../controllers/evaluationController.js';
+import {
+  getQualificationStatus,
+  selectAlternativeProgram,
+} from '../controllers/evaluationController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get evaluation result for a specific application (Candidate or Admin)
-router.get('/:applicationId', getEvaluation);
+// Require a valid token for all evaluation endpoints (any authenticated role)
+router.use(protect);
 
-// Candidate reconsiders application (switch or continue) - one-time only
-router.post('/:applicationId/reconsider', reconsiderApplication);
+// Get qualification status + suggested alternative programs for an application
+router.get('/:applicationId', getQualificationStatus);
 
-// Admin suggests or updates alternative program
-router.post('/:applicationId/suggest-alternative', suggestAlternative);
+// Select an alternative program (updates Application.programId for exam generation)
+router.post('/:applicationId/select-alternative', selectAlternativeProgram);
 
 export default router;
