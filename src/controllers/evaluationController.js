@@ -1,200 +1,177 @@
 import { prisma } from '../config/db.js';
 
-// Get evaluation result for a specific application
-const getEvaluation = async (req, res) => {
-    const { applicationId } = req.params;
-    const userId = req.user.id;
-    const userRole = req.user.role;
+const assertCanAccessApplication = (application, req) => {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
 
-    try {
-        // Fetch application with related data
-        const application = await prisma.applications.findUnique({
-            where: { id: parseInt(applicationId) },
-            include: {
-                cv_analysis_results: true,
-                candidate_feedback: true,
-                alternative_programs: {
-                    include: {
-                        degrees: true
-                    }
-                },
-                degrees: true,
-                users: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true
-                    }
-                }
+  if (!userId) return { ok: false, status: 401, error: 'Not authenticated' };
+  if (userRole === 'ADMIN') return { ok: true };
+
+  if (application.candidateId !== userId) {
+    return { ok: false, status: 403, error: 'Access denied' };
+  }
+
+  return { ok: true };
+};
+
+// Get qualification status from CandidateFeedback + suggested alternative degrees (AlternativeProgram)
+const getQualificationStatus = async (req, res) => {
+  const { applicationId } = req.params;
+
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      select: {
+        id: true,
+        candidateId: true,
+        programId: true,
+        status: true,
+        reconsiderationLocked: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const access = assertCanAccessApplication(application, req);
+    if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+    const latestFeedback = await prisma.candidateFeedback.findFirst({
+      where: { applicationId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        feedbackType: true,
+        message: true,
+        createdAt: true,
+        alternativePrograms: {
+          select: {
+            id: true,
+            programId: true,
+            reason: true,
+            matchScore: true,
+            program: {
+              select: {
+                id: true,
+                name: true,
+                level: true,
+                duration: true,
+                capacity: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        application: {
+          id: application.id,
+          programId: application.programId,
+          status: application.status,
+          reconsiderationLocked: application.reconsiderationLocked,
+        },
+        qualification: latestFeedback
+          ? {
+              feedbackId: latestFeedback.id,
+              feedbackType: latestFeedback.feedbackType,
+              message: latestFeedback.message,
+              createdAt: latestFeedback.createdAt,
             }
-        });
-
-        if (!application) {
-            return res.status(404).json({ error: "Application not found !" });
-        }
-
-        // Authorization: Candidate can only access their own application
-        if (userRole !== 'ADMIN' && application.user_id !== userId) {
-            return res.status(403).json({ error: "Access denied" });
-        }
-
-        res.status(200).json({
-            status: "success",
-            data: application
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to retrieve evaluation", details: error.message });
-    }
+          : null,
+        alternatives: latestFeedback?.alternativePrograms ?? [],
+      },
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: 'Failed to retrieve qualification status', details: error.message });
+  }
 };
 
-// Allow candidate to reconsider application (switch or continue)
-const reconsiderApplication = async (req, res) => {
-    const { applicationId } = req.params;
-    const { action } = req.body; // "switch" or "continue"
-    const userId = req.user.id;
-    const userRole = req.user.role;
+// Update Application.programId when user selects an alternative program
+// Body: { programId: "<degree_uuid>" }
+const selectAlternativeProgram = async (req, res) => {
+  const { applicationId } = req.params;
+  const { programId } = req.body;
 
-    try {
-        // Fetch application
-        const application = await prisma.applications.findUnique({
-            where: { id: parseInt(applicationId) },
-            include: {
-                alternative_programs: true
-            }
-        });
+  if (!programId) {
+    return res.status(400).json({ error: 'programId is required' });
+  }
 
-        if (!application) {
-            return res.status(404).json({ error: "Application not found" });
-        }
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      select: {
+        id: true,
+        candidateId: true,
+        programId: true,
+        reconsiderationLocked: true,
+      },
+    });
 
-        // Authorization: Only candidate can reconsider their own application
-        if (application.user_id !== userId) {
-            return res.status(403).json({ error: "Access denied" });
-        }
-
-        // Check if reconsideration is locked
-        if (application.reconsideration_locked) {
-            return res.status(400).json({ error: "Reconsideration already used" });
-        }
-
-        // Validate action
-        if (!action || (action !== "switch" && action !== "continue")) {
-            return res.status(400).json({ error: "Invalid action. Use 'switch' or 'continue'" });
-        }
-
-        // Check if alternative program exists
-        if (!application.alternative_programs) {
-            return res.status(400).json({ error: "No alternative program suggested" });
-        }
-
-        let updatedApplication;
-
-        if (action === "switch") {
-            // Switch to suggested program
-            updatedApplication = await prisma.applications.update({
-                where: { id: parseInt(applicationId) },
-                data: {
-                    degree_id: application.alternative_programs.suggested_program_id,
-                    reconsideration_locked: true
-                },
-                include: {
-                    degrees: true
-                }
-            });
-        } else {
-            // Continue with original program
-            updatedApplication = await prisma.applications.update({
-                where: { id: parseInt(applicationId) },
-                data: {
-                    reconsideration_locked: true
-                },
-                include: {
-                    degrees: true
-                }
-            });
-        }
-
-        res.status(200).json({
-            status: "success",
-            message: action === "switch" ? "Switched to suggested program" : "Continuing with original program",
-            data: updatedApplication
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to process reconsideration", details: error.message });
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
     }
+
+    const access = assertCanAccessApplication(application, req);
+    if (!access.ok) return res.status(access.status).json({ error: access.error });
+
+    if (application.reconsiderationLocked) {
+      return res.status(400).json({ error: 'Alternative selection already used' });
+    }
+
+    const latestFeedback = await prisma.candidateFeedback.findFirst({
+      where: { applicationId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        alternativePrograms: {
+          select: { programId: true },
+        },
+      },
+    });
+
+    if (!latestFeedback) {
+      return res.status(400).json({ error: 'No feedback found for this application' });
+    }
+
+    const allowedProgramIds = new Set(
+      (latestFeedback.alternativePrograms ?? []).map((p) => p.programId)
+    );
+
+    if (!allowedProgramIds.has(programId)) {
+      return res.status(400).json({ error: 'Selected program is not an allowed alternative' });
+    }
+
+    const updated = await prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        programId,
+        reconsiderationLocked: true,
+      },
+      select: {
+        id: true,
+        programId: true,
+        reconsiderationLocked: true,
+        status: true,
+      },
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Application program updated successfully',
+      data: updated,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: 'Failed to select alternative program', details: error.message });
+  }
 };
 
-// Admin: Suggest or update alternative degree program
-const suggestAlternative = async (req, res) => {
-    const { applicationId } = req.params;
-    const { suggested_program_id, reason } = req.body;
-    const userRole = req.user.role;
-
-    try {
-        // Authorization: Only admin can suggest alternatives
-        if (userRole !== 'ADMIN') {
-            return res.status(403).json({ error: "Access denied. Admin only" });
-        }
-
-        // Validate application exists
-        const application = await prisma.applications.findUnique({
-            where: { id: parseInt(applicationId) }
-        });
-
-        if (!application) {
-            return res.status(404).json({ error: "Application not found" });
-        }
-
-        // Validate suggested program exists
-        const suggestedDegree = await prisma.degrees.findUnique({
-            where: { id: parseInt(suggested_program_id) }
-        });
-
-        if (!suggestedDegree) {
-            return res.status(404).json({ error: "Suggested degree program not found" });
-        }
-
-        // Check if alternative already exists
-        const existingAlternative = await prisma.alternative_programs.findUnique({
-            where: { application_id: parseInt(applicationId) }
-        });
-
-        let alternative;
-
-        if (existingAlternative) {
-            // Update existing alternative
-            alternative = await prisma.alternative_programs.update({
-                where: { application_id: parseInt(applicationId) },
-                data: {
-                    suggested_program_id: parseInt(suggested_program_id),
-                    reason: reason || null
-                },
-                include: {
-                    degrees: true
-                }
-            });
-        } else {
-            // Create new alternative
-            alternative = await prisma.alternative_programs.create({
-                data: {
-                    application_id: parseInt(applicationId),
-                    suggested_program_id: parseInt(suggested_program_id),
-                    reason: reason || null
-                },
-                include: {
-                    degrees: true
-                }
-            });
-        }
-
-        res.status(200).json({
-            status: "success",
-            message: existingAlternative ? "Alternative program updated" : "Alternative program suggested",
-            data: alternative
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to suggest alternative", details: error.message });
-    }
-};
-
-export { getEvaluation, reconsiderApplication, suggestAlternative };
+export { getQualificationStatus, selectAlternativeProgram };
