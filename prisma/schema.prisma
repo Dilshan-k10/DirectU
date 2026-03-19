@@ -115,11 +115,12 @@ enum ApplicationStatus {
 }
 
 model Intake {
-  id        String    @id @default(uuid())
-  name      String    @map("intake_name")
+  id        String       @id @default(uuid())
+  name      String       @map("intake_name")
   year      Int
-  startDate DateTime? @map("start_date") @db.Date
-  endDate   DateTime? @map("end_date") @db.Date
+  status    IntakeStatus @default(Active)
+  startDate DateTime?    @map("start_date") @db.Date
+  endDate   DateTime?    @map("end_date") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -127,6 +128,11 @@ model Intake {
   rankings     Ranking[]
 
   @@map("intakes")
+}
+
+enum IntakeStatus {
+  Active
+  Inactive
 }
 
 model CVAnalysisResult {
