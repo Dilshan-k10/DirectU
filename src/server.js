@@ -2,7 +2,6 @@ import express from 'express';
 import { config } from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { connectDB, disconnectDB } from './config/db.js';  
-import { error } from 'console';
 import authRoutes from './Routes/authRoutes.js';
 import uniadminRoutes from './Routes/uniadminRoutes.js';
 import examRoutes from './Routes/examRoutes.js';
@@ -12,7 +11,6 @@ import evaluationRoutes from './Routes/evaluationRoutes.js';
 import notificationRoutes from './Routes/notificationRoutes.js';
 
 const app = express();
-const server = express.Router();
 
 config();
 
@@ -34,7 +32,7 @@ connectDB();
 
 
 const PORT = 5001;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 

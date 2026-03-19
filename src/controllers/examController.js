@@ -1,6 +1,7 @@
 import { prisma } from '../config/db.js';
 import { generateMcqsForDegree } from '../services/geminiQuestionService.js';
 import { updateDegreeRanking } from '../services/rankingService.js';
+import { sendEmail } from '../services/mailService.js';
 
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
@@ -135,7 +136,8 @@ const getRandomQuestionsByDegree = async (req, res) => {
     });
     const servedCount = served.length;
 
-    // For the first 20 students per degree, generate new AI questions and store them in QuestionBank
+    // For the first 20 students per degree, generate new AI questions and store them in QuestionBank.
+    // If AI generation fails (quota/network/etc.), log the error but continue and rely on existing questions.
     if (servedCount < 20) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
@@ -192,12 +194,8 @@ const getRandomQuestionsByDegree = async (req, res) => {
           skipDuplicates: true,
         });
       } catch (aiError) {
-        console.error('AI question generation failed:', aiError);
-        return res.status(502).json({
-          success: false,
-          message: 'Failed to generate exam questions. Please try again later.',
-          data: null,
-        });
+        console.error('AI question generation failed, falling back to existing pool:', aiError);
+        // Do not return here; we will still try to use whatever questions already exist in QuestionBank.
       }
     }
 
@@ -471,7 +469,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
     // Validate student exists
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { id: true },
+      select: { id: true, email: true },
     });
 
     if (!student) {
@@ -561,6 +559,17 @@ const calculateFinalScoreAndSave = async (req, res) => {
       },
     });
 
+    // Send exam submission score email (do not block main flow on email failure)
+    try {
+      if (student.email) {
+        const subject = 'Exam Submitted Successfully';
+        const message = `Your exam has been submitted successfully. Your score is ${updatedResult.obtainedMarks}. Please wait for selection confirmation at the end of the intake.`;
+        await sendEmail(student.email, subject, message);
+      }
+    } catch (mailErr) {
+      console.error('Failed to send exam submission score email:', mailErr);
+    }
+
     // Recalculate rankings for this degree (do not block on failure)
     try {
       await updateDegreeRanking(degreeId);
@@ -630,6 +639,12 @@ const getStudentRankings = async (req, res) => {
               select: {
                 id: true,
                 name: true,
+                email: true,
+              },
+            },
+            program: {
+              select: {
+                name: true,
               },
             },
             testResult: {
@@ -660,6 +675,47 @@ const getStudentRankings = async (req, res) => {
           ? row.application.testResult.obtainedMarks
           : 0,
     }));
+
+    // Send ranking emails when rankings are fetched.
+    // Rules: per degree, rank 1-2 => selected, others => not selected.
+    // This should never break the rankings response.
+    try {
+      const byDegree = new Map();
+      for (const row of rankings) {
+        const did = row.degreeId;
+        if (!byDegree.has(did)) byDegree.set(did, []);
+        byDegree.get(did).push(row);
+      }
+
+      const emailOps = [];
+      for (const [did, rows] of byDegree.entries()) {
+        const degreeName = rows?.[0]?.application?.program?.name || did;
+        for (const r of rows) {
+          const email = r?.application?.candidate?.email;
+          if (!email) continue;
+
+          const selected = typeof r.rank === 'number' ? r.rank <= 2 : false;
+          const subject = selected ? 'Congratulations!' : 'Application Update';
+          const message = selected
+            ? `Congratulations! You have been selected for ${degreeName}. Please wait for further details from the university.`
+            : `We are sorry, you were not selected for ${degreeName}. Start a new journey with DirectU and explore new opportunities.`;
+
+          emailOps.push(
+            (async () => {
+              try {
+                await sendEmail(email, subject, message);
+              } catch (err) {
+                console.error(`Failed to send ranking email to ${email}:`, err);
+              }
+            })()
+          );
+        }
+      }
+
+      await Promise.all(emailOps);
+    } catch (emailErr) {
+      console.error('Failed to dispatch ranking emails:', emailErr);
+    }
 
     return res.status(200).json({
       success: true,

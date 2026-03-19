@@ -1,84 +1,87 @@
 import { prisma } from '../config/db.js';
-import { sendFinalSelectionEmail } from './mailService.js';
+import { sendEmail } from './mailService.js';
 
 export const processIntakeResults = async (intakeId) => {
   if (!intakeId) {
     throw new Error('intakeId is required');
   }
 
-  const rankings = await prisma.ranking.findMany({
-    where: { intakeId },
-    orderBy: { rank: 'asc' },
-    include: {
-      application: {
-        select: {
-          id: true,
-          program: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          candidate: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
+  // Dynamic ranking (no ranking persistence): per degree, sort by obtainedMarks DESC and notify candidates.
+  const rows = await prisma.application.findMany({
+    where: {
+      intakeId,
+      testResult: {
+        status: 'completed',
+        obtainedMarks: { not: null },
       },
+    },
+    select: {
+      id: true,
+      program: { select: { id: true, name: true } },
+      candidate: { select: { email: true } },
+      testResult: { select: { obtainedMarks: true } },
     },
   });
 
-  if (!rankings || rankings.length === 0) {
-    console.log(`No rankings found for intake ${intakeId}.`);
+  if (!rows || rows.length === 0) {
+    console.log(`No completed exam results found for intake ${intakeId}.`);
     return;
   }
 
-  console.log(
-    `Processing intake results for intake ${intakeId}. Total ranked applications: ${rankings.length}`
-  );
+  const byDegree = new Map();
+  for (const r of rows) {
+    const degreeId = r.program?.id;
+    if (!degreeId) continue;
+    if (!byDegree.has(degreeId)) byDegree.set(degreeId, []);
+    byDegree.get(degreeId).push(r);
+  }
 
-  const operations = [];
+  const emailOps = [];
 
-  for (const ranking of rankings) {
-    const isSelected = ranking.rank <= 100;
-    const email = ranking.application.candidate.email;
+  for (const [, apps] of byDegree.entries()) {
+    const degreeName = apps[0]?.program?.name || 'your selected degree';
 
-    if (!email) {
-      console.warn(
-        `Skipping email for application ${ranking.application.id} - candidate has no email.`
-      );
-    } else {
-      operations.push(
+    const ranked = apps
+      .map((a) => ({
+        applicationId: a.id,
+        email: a.candidate?.email || null,
+        marks: typeof a.testResult?.obtainedMarks === 'number' ? a.testResult.obtainedMarks : 0,
+      }))
+      .sort((a, b) => {
+        if (b.marks !== a.marks) return b.marks - a.marks;
+        return String(a.applicationId).localeCompare(String(b.applicationId));
+      });
+
+    for (let idx = 0; idx < ranked.length; idx++) {
+      const entry = ranked[idx];
+      const email = entry.email;
+      if (!email) continue;
+
+      const isTopTwo = idx < 2;
+      const subject = isTopTwo ? 'Congratulations!' : 'Application Update';
+      const message = isTopTwo
+        ? `Congratulations! You have been selected for ${degreeName}. Please wait for further details from the university.`
+        : `We are sorry, you were not selected for ${degreeName}. Start a new journey with DirectU and explore new opportunities.`;
+
+      emailOps.push(
         (async () => {
           try {
-            await sendFinalSelectionEmail(email, isSelected);
-          } catch (error) {
+            await sendEmail(email, subject, message);
+          } catch (err) {
             console.error(
-              `Failed to send final selection email for application ${ranking.application.id}:`,
-              error
+              `Failed to send intake result email for application ${entry.applicationId}:`,
+              err
             );
           }
         })()
       );
     }
-
-    operations.push(
-      prisma.ranking.update({
-        where: { applicationId: ranking.application.id },
-        data: {
-          status: isSelected ? 'accepted' : 'rejected',
-        },
-      })
-    );
   }
 
-  await Promise.all(operations);
+  await Promise.all(emailOps);
 
   console.log(
-    `Finished processing intake results for intake ${intakeId}. Emails dispatched and rankings updated.`
+    `Finished processing intake results for intake ${intakeId}. Selection emails dispatched.`
   );
 };
 

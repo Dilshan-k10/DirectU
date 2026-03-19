@@ -1,20 +1,72 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_APP_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false, // allow self‑signed / intercepted certs
-  },
-});
+function resolveEmailAuth() {
+  const user =
+    process.env.EMAIL_USER ||
+    process.env.MAIL_USER ||
+    process.env.SMTP_USER ||
+    process.env.GMAIL_USER;
+
+  const pass =
+    process.env.EMAIL_APP_PASSWORD ||
+    process.env.EMAIL_PASS ||
+    process.env.EMAIL_PASSWORD ||
+    process.env.MAIL_PASS ||
+    process.env.SMTP_PASS ||
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.GMAIL_APP_PASSWORD;
+
+  return { user, pass };
+}
+
+let transporterPromise = null;
+
+async function getTransporter() {
+  const { user, pass } = resolveEmailAuth();
+  const safeUser = typeof user === 'string' ? user.trim() : '';
+  const safePass = typeof pass === 'string' ? pass.trim() : '';
+
+  if (!safeUser || !safePass) {
+    console.warn(
+      '[mailService] Email credentials missing. Set EMAIL_USER and EMAIL_APP_PASSWORD in .env (or EMAIL_PASS as fallback).'
+    );
+    return null;
+  }
+
+  if (!transporterPromise) {
+    transporterPromise = (async () => {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: safeUser, pass: safePass },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+
+      try {
+        await transporter.verify();
+        console.log('[mailService] Mail transporter verified.');
+      } catch (err) {
+        console.error('[mailService] Mail transporter verification failed:', err);
+      }
+
+      return transporter;
+    })();
+  }
+
+  return transporterPromise;
+}
 
 export const sendEmail = async (to, subject, message) => {
   try {
+    const transporter = await getTransporter();
+    if (!transporter) return;
+
+    const { user } = resolveEmailAuth();
+    const safeUser = typeof user === 'string' ? user.trim() : '';
+
     await transporter.sendMail({
-      from: `"DirectU" <${process.env.EMAIL_USER}>`,
+      from: `"DirectU" <${safeUser || 'no-reply@directu.local'}>`,
       to,
       subject,
       text: message,
