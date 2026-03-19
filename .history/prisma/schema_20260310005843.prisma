@@ -115,12 +115,11 @@ enum ApplicationStatus {
 }
 
 model Intake {
-  id        String       @id @default(uuid())
-  name      String       @map("intake_name")
+  id        String    @id @default(uuid())
+  name      String    @map("intake_name")
   year      Int
-  status    IntakeStatus @default(Active)
-  startDate DateTime?    @map("start_date") @db.Date
-  endDate   DateTime?    @map("end_date") @db.Date
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -128,11 +127,6 @@ model Intake {
   rankings     Ranking[]
 
   @@map("intakes")
-}
-
-enum IntakeStatus {
-  Active
-  Inactive
 }
 
 model CVAnalysisResult {
@@ -182,7 +176,7 @@ enum FeedbackType {
   needs_improvement
 }
 
-model AlternativeProgram {
+model AlternativeProgram {.
   id         String   @id @default(uuid())
   feedbackId String   @map("feedback_id")
   programId  String   @map("program_id")
@@ -228,7 +222,6 @@ model QuestionBank {
 
   degree           Degree            @relation(fields: [degreeId], references: [id])
   candidateAnswers CandidateAnswer[]
-  examQuestionAssignments ExamQuestionAssignment[]
 
   @@index([degreeId], map: "idx_question_bank_degree")
   @@map("question_bank")
@@ -248,29 +241,9 @@ model TestResult {
 
   application      Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   candidateAnswers CandidateAnswer[]
-  examQuestionAssignments ExamQuestionAssignment[]
 
   @@index([applicationId], map: "idx_test_results_application")
   @@map("test_results")
-}
-
-model ExamQuestionAssignment {
-  id           String   @id @default(uuid())
-  testResultId String   @map("test_result_id")
-  questionId   String   @map("question_id")
-  order        Int?
-  studentId    String?  @map("student_id")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  testResult TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
-  question   QuestionBank @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([testResultId, questionId])
-  @@index([testResultId], map: "idx_exam_q_assign_test")
-  @@index([questionId], map: "idx_exam_q_assign_question")
-  @@index([studentId], map: "idx_exam_q_assign_student")
-  @@map("exam_question_assignments")
 }
 
 model CandidateAnswer {
