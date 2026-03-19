@@ -65,6 +65,7 @@ class AnalysisResponse(BaseModel):
     qualification_status: str
     qualification_match: bool
     similarity_scores: Dict[str, float]
+    application_status: str
 
 
 # ================================
@@ -295,7 +296,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
             # 1️⃣ Load application data, including selected degree and CV PDF
             application_row = await conn.fetchrow(
                 """
-                SELECT id, program_id, document_data, document_name, document_type
+                SELECT id, program_id, document_data, document_name, document_type, status
                 FROM applications
                 WHERE id = $1
                 """,
@@ -307,6 +308,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
 
             selected_program_id: str = application_row["program_id"]
             document_data = application_row["document_data"]
+            current_application_status: str = application_row["status"]
 
             if not document_data:
                 raise HTTPException(
@@ -424,7 +426,36 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 None,
             )
 
-            # 8️⃣ Save predicted program in alternative_programs when it differs from selected
+            # 8️⃣ Update application status based on qualification result
+            # See prisma/migrations/... for allowed values in ApplicationStatus enum.
+            status_map = {
+                "qualified": "qualified",
+                "overqualified": "qualified",
+                "underqualified": "not_qualified",
+            }
+            application_status = status_map.get(qualification_status, current_application_status)
+            # Always attempt to persist a status, even if it doesn't change.
+            update_result = await conn.execute(
+                """
+                UPDATE applications
+                SET status = $1,
+                    updated_at = NOW()
+                WHERE id = $2
+                """,
+                application_status,
+                payload.application_id,
+            )
+
+            if not update_result.startswith("UPDATE 1"):
+                # Fail fast in case the record was not updated (e.g. id mismatch).
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update application status (db response: {update_result})",
+                )
+            
+            
+
+            # 9️⃣ Save predicted program in alternative_programs when it differs from selected
             if predicted_program_id and predicted_program_id != selected_program_id:
                 alt_id = str(uuid.uuid4())
                 predicted_degree = ml_label
@@ -474,6 +505,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
         qualification_status=qualification_status,
         qualification_match=qualification_match,
         similarity_scores=similarity_scores,
+        application_status=application_status,
     )
 
 
