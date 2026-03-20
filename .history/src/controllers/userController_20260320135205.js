@@ -24,7 +24,7 @@ const getAllApplicants = async (req, res) => {
 
 const getAllAdmins = async (req, res) => {
     const admins = await prisma.user.findMany({
-        where: { role: 'ADMIN' },
+        where: { role: 'admin' },
         select: {
             id: true,
             name: true,
