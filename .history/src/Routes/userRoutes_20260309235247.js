@@ -5,7 +5,7 @@ import { authorize } from '../middleware/authorizationMiddleware.js';
 
 const router = express.Router();
 
-router.use(protect, authorize('ADMIN'));
+router.use(protect, authorize('admin'));
 
 router.get('/applicants', getAllApplicants);
 
