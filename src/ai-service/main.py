@@ -220,12 +220,16 @@ def _evaluate_single_rule(rule_type: str, conditions: Dict[str, Any], features: 
 
 def evaluate_qualification_from_criteria(
     criteria_rows: List[asyncpg.Record], features: Dict[str, Any]
-) -> str:
+) -> tuple[str, float]:
     """
     Evaluate qualification status using rules stored in qualification_criteria.
+    Returns: (qualification_status, match_score)
+    match_score is calculated as: criteria_met / total_criteria
     """
     mandatory_failed = False
     extra_achievements = False
+    criteria_met = 0
+    total_criteria = len(criteria_rows)
 
     for row in criteria_rows:
         import json
@@ -240,16 +244,22 @@ def evaluate_qualification_from_criteria(
 
         passed = _evaluate_single_rule(rule_type, conditions, features)
 
+        if passed:
+            criteria_met += 1
+
         if is_mandatory and not passed:
             mandatory_failed = True
         if (not is_mandatory) and passed:
             extra_achievements = True
 
+    # Calculate match score
+    match_score = criteria_met / total_criteria if total_criteria > 0 else 0.0
+
     if mandatory_failed:
-        return "underqualified"
+        return "underqualified", match_score
     if extra_achievements:
-        return "overqualified"
-    return "qualified"
+        return "overqualified", match_score
+    return "qualified", match_score
 
 
 def map_predicted_degree_to_program_id(predicted_degree, degree_rows):
@@ -349,7 +359,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 selected_program_id,
             )
 
-            qualification_status = evaluate_qualification_from_criteria(
+            qualification_status, selected_program_match_score = evaluate_qualification_from_criteria(
                 criteria_rows, features
             )
 
@@ -384,7 +394,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 payload.application_id,
                 json.dumps(features),
                 qualification_match,
-                float(round(confidence, 2)),
+                float(round(selected_program_match_score, 2)),
                 "completed",
                 analyzed_at,
             )
