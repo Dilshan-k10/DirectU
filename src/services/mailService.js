@@ -79,9 +79,11 @@ export const sendEmail = async (to, subject, message) => {
   }
 };
 
-export const sendWelcomeEmail = async (email, name) => {
+export const sendWelcomeEmail = async (email, programName) => {
   const subject = 'Welcome to DirectU';
-  const message = `Welcome to DirectU.
+  const message = `${programName},
+
+Welcome to DirectU.
 
 Your account has been successfully created.
 You can now submit your application.
@@ -97,7 +99,7 @@ export const sendApplicationSubmissionEmail = async (email, programName) => {
 
 You will receive further instructions regarding the entrance examination.
 
-DirectU`;
+DirectU Team`;
 
   await sendEmail(email, subject, message);
 };
@@ -110,7 +112,7 @@ Score: ${score}
 
 Please wait for further communication from the university regarding the final results.
 
-DirectU`;
+DirectU Team`;
 
   await sendEmail(email, subject, message);
 };
@@ -123,7 +125,9 @@ export const sendFinalSelectionEmail = async (email, selected) => {
 Further instructions will be provided by the university.`
     : `Thank you for applying.
 
-Unfortunately you were not selected for this intake. We encourage you to apply again in the future.`;
+Unfortunately you were not selected for this intake. We encourage you to apply again in the future.
+
+DirectU Team`;
 
   await sendEmail(email, subject, message);
 };

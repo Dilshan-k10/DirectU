@@ -66,6 +66,15 @@ const getQualificationStatus = async (req, res) => {
       },
     });
 
+    const cvAnalysisResult = await prisma.cVAnalysisResult.findFirst({
+      where: { applicationId },
+      orderBy: { analyzedAt: 'desc' },
+      select: {
+        confidenceScore: true,
+        analyzedAt: true,
+      },
+    });
+
     return res.status(200).json({
       status: 'success',
       data: {
@@ -81,6 +90,8 @@ const getQualificationStatus = async (req, res) => {
               feedbackType: latestFeedback.feedbackType,
               message: latestFeedback.message,
               createdAt: latestFeedback.createdAt,
+              confidenceScore: cvAnalysisResult?.confidenceScore ?? null,
+              analyzedAt: cvAnalysisResult?.analyzedAt ?? null,
             }
           : null,
         alternatives: latestFeedback?.alternativePrograms ?? [],
