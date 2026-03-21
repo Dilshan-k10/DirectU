@@ -470,8 +470,8 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 alt_id = str(uuid.uuid4())
                 predicted_degree = ml_label
                 reason_parts = [
-                    f"Predicted best-fit degree: {predicted_degree}.",
-                    "Selected program differs from predicted program.",
+                    f"Best-fit degree for you: {predicted_degree}.",
+                    "According to your CV qualifications, Selected program is not the Best-Fit for you.",
                 ]
                 if qualification_status == "underqualified":
                     reason_parts.append(
