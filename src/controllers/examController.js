@@ -6,8 +6,6 @@ import { sendEmail } from '../services/mailService.js';
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
     const { degreeId } = req.params;
-
-    // Ensure the request is authenticated and we have a logged-in user
     const loggedInUserId = req.user?.id;
     if (!loggedInUserId) {
       return res.status(401).json({
@@ -17,7 +15,6 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Find the latest application for this logged-in user and degree
     const application = await prisma.application.findFirst({
       where: {
         candidateId: loggedInUserId,
@@ -41,7 +38,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Only release exam if application status is "qualified"
+    
     if (application.status !== 'qualified') {
       return res.status(403).json({
         success: false,
@@ -54,7 +51,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Validate that the degree exists (based on application.programId)
+    
     const degree = await prisma.degree.findUnique({
       where: { id: application.programId },
       select: { id: true, name: true },
@@ -68,7 +65,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Ensure a testResult exists for locking question assignments (Pattern B)
+    
     let testResult = await prisma.testResult.findUnique({
       where: { applicationId: application.id },
       select: { id: true, status: true, startTime: true },
@@ -90,7 +87,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // If questions are already assigned to this testResult, return the locked set
+    
     const existingAssignments = await prisma.examQuestionAssignment.findMany({
       where: { testResultId: testResult.id },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
@@ -122,7 +119,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Count how many students have already received locked question sets for this degree
+    
     const served = await prisma.examQuestionAssignment.findMany({
       where: {
         testResult: {
@@ -136,20 +133,19 @@ const getRandomQuestionsByDegree = async (req, res) => {
     });
     const servedCount = served.length;
 
-    // For the first 20 students per degree, generate new AI questions and store them in QuestionBank.
-    // If AI generation fails (quota/network/etc.), log the error but continue and rely on existing questions.
+    
     if (servedCount < 20) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
 
-        // Derive degree code from degree.id, e.g. "deg_bda_001" -> "bda"
+        
         let degreeCode = 'gen';
         const match = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
         if (match && match[1]) {
           degreeCode = match[1].toLowerCase();
         }
 
-        // Find the last question id for this degree in format q_{degreeCode}_{number}
+        
         const lastAiQuestion = await prisma.questionBank.findFirst({
           where: {
             degreeId: degree.id,
@@ -171,7 +167,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
           }
         }
 
-        // Create questions with ids: q_{degreeCode}_{NNN}
+        
         const toCreate = generated.map((q, index) => {
           const nextNumber = lastNumber + index + 1;
           const suffix = String(nextNumber).padStart(3, '0');
@@ -195,11 +191,11 @@ const getRandomQuestionsByDegree = async (req, res) => {
         });
       } catch (aiError) {
         console.error('AI question generation failed, falling back to existing pool:', aiError);
-        // Do not return here; we will still try to use whatever questions already exist in QuestionBank.
+        
       }
     }
 
-    // Fetch pool for this degree (exclude correct answers)
+    
     const pool = await prisma.questionBank.findMany({
       where: { degreeId: degree.id },
       select: {
@@ -221,7 +217,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Randomly select 10 questions and lock them for this testResult
+    
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -273,7 +269,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 1. Validate student exists
+    
     const student = await prisma.user.findUnique({
       where: { id: studentId },
       select: { id: true, email: true, name: true },
@@ -287,7 +283,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 2. Validate degree exists
+    
     const degree = await prisma.degree.findUnique({
       where: { id: degreeId },
       select: { id: true },
@@ -301,7 +297,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // Basic answers validation + normalization
+    
     const normalizedAnswers = [];
     for (let i = 0; i < answers.length; i++) {
       const entry = answers[i];
@@ -341,7 +337,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 3 & 4. Validate questions belong to degree + fetch correct answers
+    
     const questions = await prisma.questionBank.findMany({
       where: {
         id: { in: uniqueQuestionIds },
@@ -365,7 +361,7 @@ const submitStudentAnswers = async (req, res) => {
       questions.map((q) => [q.id, (q.correctAnswer || '').trim().toUpperCase()])
     );
 
-    // Find the student's application for this degree
+    
     const application = await prisma.application.findFirst({
       where: {
         candidateId: studentId,
@@ -387,7 +383,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // Ensure testResult exists (CandidateAnswer requires testResultId)
+    
     let testResult = await prisma.testResult.findUnique({
       where: { applicationId: application.id },
       select: { id: true, status: true },
@@ -412,7 +408,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 5, 6, 7. Compare & save (no total score calculation, no correct answers in response)
+    
     const ops = normalizedAnswers.map((a) => {
       const correctAnswer = correctAnswerByQuestionId.get(a.questionId);
       const isCorrect = a.selectedAnswer === correctAnswer;
@@ -466,7 +462,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Validate student exists
+    
     const student = await prisma.user.findUnique({
       where: { id: studentId },
       select: { id: true, email: true },
@@ -480,7 +476,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Validate degree exists
+    
     const degree = await prisma.degree.findUnique({
       where: { id: degreeId },
       select: { id: true },
@@ -494,7 +490,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Find the student's latest application for this degree
+    
     const application = await prisma.application.findFirst({
       where: {
         candidateId: studentId,
@@ -516,7 +512,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Fetch test result with all candidate answers
+    
     const testResult = await prisma.testResult.findUnique({
       where: { applicationId: application.id },
       include: {
@@ -536,7 +532,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Calculate total score: 10 marks per correct answer
+    
     let correctCount = 0;
     for (let i = 0; i < testResult.candidateAnswers.length; i++) {
       const answer = testResult.candidateAnswers[i];
@@ -547,7 +543,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
 
     const totalScore = correctCount * 10;
 
-    // Save total score using existing attributes (no schema changes)
+    
     const updatedResult = await prisma.testResult.update({
       where: { id: testResult.id },
       data: {
@@ -559,7 +555,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       },
     });
 
-    // Send exam submission score email (do not block main flow on email failure)
+    
     try {
       if (student.email) {
         const subject = 'Exam Submitted Successfully';
@@ -570,7 +566,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       console.error('Failed to send exam submission score email:', mailErr);
     }
 
-    // Recalculate rankings for this degree (do not block on failure)
+    
     try {
       await updateDegreeRanking(degreeId);
     } catch (rankErr) {
@@ -676,9 +672,7 @@ const getStudentRankings = async (req, res) => {
           : 0,
     }));
 
-    // Send ranking emails when rankings are fetched.
-    // Rules: per degree, rank 1-2 => selected, others => not selected.
-    // This should never break the rankings response.
+    
     try {
       const byDegree = new Map();
       for (const row of rankings) {
