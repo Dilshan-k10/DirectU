@@ -1,15 +1,6 @@
 import { prisma } from '../config/db.js';
 
-/**
- * Recalculate and persist rankings for a degree.
- *
- * Ranking rules:
- * - Sort by obtainedMarks DESC
- * - Assign sequential rank starting from 1
- * - Store in existing Ranking table (upsert by applicationId)
- *
- * This function does NOT throw on "no results"; it simply results in no writes.
- */
+
 export async function updateDegreeRanking(degreeId) {
   if (!degreeId) {
     throw new Error('degreeId is required');

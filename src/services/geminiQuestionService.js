@@ -91,7 +91,7 @@ function normalizeCorrectAnswer(answerRaw, optionsRaw) {
   if (idx === 2) return 'C';
   if (idx === 3) return 'D';
 
-  // Sometimes model returns "O(log n)" while options contain same with spacing differences
+  
   const compact = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const idx2 = options.findIndex((o) => compact(o) === compact(answer));
   if (idx2 === 0) return 'A';
