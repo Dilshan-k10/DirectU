@@ -164,6 +164,7 @@ const selectAlternativeProgram = async (req, res) => {
       data: {
         programId,
         reconsiderationLocked: true,
+        status: 'qualified',  // User is now qualified for the selected alternative program
       },
       select: {
         id: true,
