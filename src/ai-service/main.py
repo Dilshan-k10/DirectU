@@ -15,9 +15,9 @@ from dotenv import load_dotenv, find_dotenv
 
 app = FastAPI()
 
-# ================================
+
 # LOAD TRAINED MODEL
-# ================================
+
 
 try:
     model = pickle.load(open("degree_model.pkl", "rb"))
@@ -26,10 +26,8 @@ except Exception as e:
     raise RuntimeError(f"Model loading failed: {e}")
 
 
-# ================================
-# DATABASE CONNECTION
-# ================================
 
+# DATABASE CONNECTION
 # Load environment variables from the nearest .env file so that
 # DATABASE_URL defined in the project root is automatically picked up.
 load_dotenv(find_dotenv())
@@ -49,12 +47,12 @@ async def shutdown() -> None:
     pool = app.state.db_pool
     await pool.close()
 
-# ================================
+
 # REQUEST / RESPONSE MODELS
-# ================================
+
 
 class AnalysisRequest(BaseModel):
-    # We now only need the Application ID; the service
+
     # will load the CV and selected program from the DB.
     application_id: str  # UUID string from applications.id
 
@@ -68,9 +66,9 @@ class AnalysisResponse(BaseModel):
     application_status: str
 
 
-# ================================
+
 # HELPER FUNCTIONS
-# ================================
+
 
 
 def extract_text(file_path: str) -> str:
@@ -292,9 +290,9 @@ def map_qualification_to_feedback_type(status: str) -> str:
     return "needs_improvement"
 
 
-# ================================
+
 # MAIN ANALYSIS ENDPOINT
-# ================================
+
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze(payload: AnalysisRequest, request: Request):
@@ -436,7 +434,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
                 None,
             )
 
-            # 8️⃣ Update application status based on qualification result
+       
             # See prisma/migrations/... for allowed values in ApplicationStatus enum.
             status_map = {
                 "qualified": "qualified",
@@ -465,7 +463,7 @@ async def analyze(payload: AnalysisRequest, request: Request):
             
             
 
-            # 9️⃣ Save predicted program in alternative_programs when it differs from selected
+            # Save predicted program in alternative_programs when it differs from selected
             if predicted_program_id and predicted_program_id != selected_program_id:
                 alt_id = str(uuid.uuid4())
                 predicted_degree = ml_label
@@ -519,18 +517,18 @@ async def analyze(payload: AnalysisRequest, request: Request):
     )
 
 
-# ================================
+
 # HEALTH CHECK
-# ================================
+
 
 @app.get("/health")
 async def health():
     return {"status": "AI service running"}
 
 
-# ================================
+
 # RUN SERVER
-# ================================
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

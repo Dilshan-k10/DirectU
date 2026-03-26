@@ -8,12 +8,10 @@ from sklearn.model_selection import train_test_split
 
 
 def main() -> None:
-    # =========================================
-    # Step 1 — Load dataset
-    # =========================================
-    # The CSV is expected to have at least two columns:
-    # - "resume_text": free-text CV / skills description
-    # - "degree_label": target degree program label
+    #Load dataset
+    # The CSV is expected to have at least two columns
+    # resume_text: free-text CV / skills description
+    # degree_label: target degree program label
     data_path = "cv_dataset.csv"
     df = pd.read_csv(data_path)
 
@@ -27,16 +25,11 @@ def main() -> None:
     texts = df["resume_text"].astype(str)
     labels = df["degree_label"].astype(str)
 
-    # =========================================
-    # Step 2 — Text preprocessing
-    # =========================================
     # Convert all text to lowercase for consistent vectorization.
     texts = texts.str.lower()
 
-    # =========================================
-    # Step 3 — Feature extraction (TF-IDF)
-    # =========================================
-    # Configure TfidfVectorizer as specified.
+    # Feature extraction (TF-IDF)
+
     vectorizer = TfidfVectorizer(
         stop_words="english",
         ngram_range=(1, 2),
@@ -46,26 +39,21 @@ def main() -> None:
     # Fit the vectorizer on the entire training corpus.
     X = vectorizer.fit_transform(texts)
 
-    # =========================================
-    # Step 4 — Model (LogisticRegression)
-    # =========================================
+    # Model (LogisticRegression)
     model = LogisticRegression(max_iter=500)
 
-    # =========================================
-    # Step 5 — Train/test split
-    # =========================================
+
+    # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, labels, test_size=0.2, random_state=42
     )
 
-    # =========================================
-    # Step 6 — Training
-    # =========================================
+
+    #Training
     model.fit(X_train, y_train)
 
-    # =========================================
-    # Step 7 — Evaluation
-    # =========================================
+
+    #Evaluation
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)
 
@@ -75,9 +63,8 @@ def main() -> None:
     print("\nClassification report:")
     print(classification_report(y_test, y_pred))
 
-    # =========================================
-    # Step 8 — Save artifacts
-    # =========================================
+
+    # Save artifacts
     # Save model and vectorizer to be used later by FastAPI service.
     with open("degree_model.pkl", "wb") as f_model:
         pickle.dump(model, f_model)
@@ -87,9 +74,8 @@ def main() -> None:
 
     print("\nSaved 'degree_model.pkl' and 'vectorizer.pkl'.")
 
-    # =========================================
-    # Step 9 — Simple prediction test
-    # =========================================
+
+    # Simple prediction test
     example_text = "python deep learning ai data science"
     example_text_processed = example_text.lower()
 
