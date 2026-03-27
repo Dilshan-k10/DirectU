@@ -412,39 +412,8 @@ const updateDegree = async (req, res) => {
   });
 };
 
-const getApplicantanalysisResultById = async (req, res) => {
+cosnt getApplicantanalysisResult = async (req, res) => { 
   try {
-    const { applicationId } = req.params;
-
-    const result = await prisma.cVAnalysisResult.findUnique({
-      where: { applicationId },
-      select: {
-        id: true,
-        applicationId: true,
-        extractedData: true,
-        qualificationMatch: true,
-        confidenceScore: true,
-        analysisStatus: true,
-        errorMessage: true,
-        analyzedAt: true,
-        createdAt: true,
-      },
-    });
-
-    if (!result) {
-      return res.status(404).json({ error: 'CV analysis result not found' });
-    }
-
-    return res.status(200).json({
-      status: 'success',
-      data: result,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      error: 'An error occurred while fetching CV analysis result',
-      details: error.message,
-    });
-  }
 };
 
 export {
@@ -458,5 +427,4 @@ export {
   createDegree,
   getDegrees,
   updateDegree,
-  getApplicantanalysisResultById,
 };

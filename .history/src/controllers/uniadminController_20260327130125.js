@@ -458,5 +458,5 @@ export {
   createDegree,
   getDegrees,
   updateDegree,
-  getApplicantanalysisResultById,
+  
 };

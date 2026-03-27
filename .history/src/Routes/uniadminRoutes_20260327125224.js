@@ -11,7 +11,6 @@ import {
   getDegrees,
   updateDegree,
   getIntakes,
-  getApplicantanalysisResultById
 } from '../controllers/uniadminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/authorizationMiddleware.js';
@@ -23,7 +22,7 @@ router.get('/degrees', protect, authorize('ADMIN', 'USER'), getDegrees);
 router.get('/intakes', protect, authorize('ADMIN', 'USER'), getIntakes);
 
 // CV analysis routes
-router.get('/analysisResults/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisResultById);
+router.get('/analysisResults/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisResult);
 
 // All routes below require ADMIN role
 router.use(protect, authorize('ADMIN'));
