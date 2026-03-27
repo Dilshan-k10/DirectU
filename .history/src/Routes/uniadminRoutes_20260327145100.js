@@ -11,8 +11,7 @@ import {
   getDegrees,
   updateDegree,
   getIntakes,
-  getApplicantanalysisResultById,
-  getApplicantanalysisFeedbackById,
+  getApplicantanalysisResultById
 } from '../controllers/uniadminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/authorizationMiddleware.js';
@@ -26,7 +25,7 @@ router.get('/intakes', protect, authorize('ADMIN', 'USER'), getIntakes);
 // CV analysis routes and feedback are accessible to both ADMIN and USER
 router.get('/analysisResults/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisResultById);
 
-router.get('/analysisFeedback/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisFeedbackById);
+router.get('/analysisFeedback/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisResultById);
 
 // All routes below require ADMIN role
 router.use(protect, authorize('ADMIN'));

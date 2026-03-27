@@ -451,28 +451,7 @@ const getApplicantanalysisResultById = async (req, res) => {
 const getApplicantanalysisFeedbackById = async (req, res) => { 
   try {
     const { applicationId } = req.params;
-
-    const feedback = await prisma.candidateFeedback.findFirst({
-      where: { applicationId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        applicationId: true,
-        feedbackType: true,
-        message: true,
-        suggestions: true,
-        createdAt: true,
-      },
-    });
-
-    if (!feedback) {
-      return res.status(404).json({ error: 'CV analysis feedback not found' });
-    }
-
-    return res.status(200).json({
-      status: 'success',
-      data: feedback,
-    });
+    
   } catch (error) {
     return res.status(500).json({
       error: 'An error occurred while fetching CV analysis feedback',
