@@ -5,25 +5,29 @@ import {
   getRandomQuestionsByDegree,
   submitStudentAnswers,
   calculateFinalScoreAndSave,
+  recalculateDegreeRankings,
   getStudentRankings,
 } from '../controllers/examController.js';
 
 const router = express.Router();
 
-// All exam routes require authentication
+
 router.use(protect);
 
-// GET /api/exam/questions/:degreeId
+
 router.get('/questions/:degreeId', authorize('USER'), getRandomQuestionsByDegree);
 
-// POST /api/exam/submit
+
 router.post('/submit', authorize('USER'), submitStudentAnswers);
 
-// POST /api/exam/calculate-score
+
 router.post('/calculate-score', authorize('USER'), calculateFinalScoreAndSave);
 
-// GET /api/exam/rankings
+
 router.get('/rankings', authorize('USER'), getStudentRankings);
+
+
+router.post('/rankings/recalculate/:degreeId', authorize('ADMIN'), recalculateDegreeRankings);
 
 export default router;
 

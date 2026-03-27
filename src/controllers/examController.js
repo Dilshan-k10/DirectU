@@ -1,12 +1,60 @@
 import { prisma } from '../config/db.js';
+import { generateMcqsForDegree } from '../services/geminiQuestionService.js';
+import { updateDegreeRanking } from '../services/rankingService.js';
+import { sendEmail } from '../services/mailService.js';
 
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
     const { degreeId } = req.params;
+    const loggedInUserId = req.user?.id;
+    if (!loggedInUserId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated',
+        data: null,
+      });
+    }
 
-    // Validate that the degree exists
+    const application = await prisma.application.findFirst({
+      where: {
+        candidateId: loggedInUserId,
+        programId: degreeId,
+      },
+      orderBy: {
+        appliedAt: 'desc',
+      },
+      select: {
+        id: true,
+        programId: true,
+        status: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'No application found for this degree for the logged-in user',
+        data: null,
+      });
+    }
+
+    
+    if (application.status !== 'qualified') {
+      return res.status(403).json({
+        success: false,
+        message: 'Exam not available. Application is not qualified',
+        data: {
+          applicationId: application.id,
+          degreeId: application.programId,
+          applicationStatus: application.status,
+        },
+      });
+    }
+
+    
     const degree = await prisma.degree.findUnique({
-      where: { id: degreeId },
+      where: { id: application.programId },
+      select: { id: true, name: true },
     });
 
     if (!degree) {
@@ -17,9 +65,139 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Fetch all questions related to that degree (exclude correct answers)
-    const questions = await prisma.questionBank.findMany({
-      where: { degreeId },
+    
+    let testResult = await prisma.testResult.findUnique({
+      where: { applicationId: application.id },
+      select: { id: true, status: true, startTime: true },
+    });
+
+    if (!testResult) {
+      testResult = await prisma.testResult.create({
+        data: {
+          applicationId: application.id,
+          status: 'in_progress',
+          startTime: new Date(),
+        },
+        select: { id: true, status: true, startTime: true },
+      });
+    } else if (!testResult.startTime) {
+      await prisma.testResult.update({
+        where: { id: testResult.id },
+        data: { startTime: new Date() },
+      });
+    }
+
+    
+    const existingAssignments = await prisma.examQuestionAssignment.findMany({
+      where: { testResultId: testResult.id },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        question: {
+          select: {
+            id: true,
+            questionText: true,
+            optionA: true,
+            optionB: true,
+            optionC: true,
+            optionD: true,
+          },
+        },
+      },
+    });
+
+    if (existingAssignments.length === 10) {
+      return res.status(200).json({
+        success: true,
+        message: 'Exam questions fetched successfully',
+        data: {
+          applicationId: application.id,
+          degreeId: degree.id,
+          applicationStatus: application.status,
+          testResultId: testResult.id,
+          questions: existingAssignments.map((a) => a.question),
+        },
+      });
+    }
+
+    
+    const served = await prisma.examQuestionAssignment.findMany({
+      where: {
+        testResult: {
+          application: {
+            programId: degree.id,
+          },
+        },
+      },
+      distinct: ['testResultId'],
+      select: { testResultId: true },
+    });
+    const servedCount = served.length;
+
+    
+    if (servedCount < 20) {
+      try {
+        const generated = await generateMcqsForDegree({ degreeName: degree.name });
+
+        
+        let degreeCode = 'gen';
+        const match = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
+        if (match && match[1]) {
+          degreeCode = match[1].toLowerCase();
+        }
+
+        
+        const lastAiQuestion = await prisma.questionBank.findFirst({
+          where: {
+            degreeId: degree.id,
+            id: {
+              startsWith: `q_${degreeCode}_`,
+            },
+          },
+          select: { id: true },
+          orderBy: { id: 'desc' },
+        });
+
+        let lastNumber = 0;
+        if (lastAiQuestion?.id) {
+          const parts = String(lastAiQuestion.id).split('_');
+          const maybeNum = parts[parts.length - 1];
+          const parsed = parseInt(maybeNum, 10);
+          if (!Number.isNaN(parsed)) {
+            lastNumber = parsed;
+          }
+        }
+
+        
+        const toCreate = generated.map((q, index) => {
+          const nextNumber = lastNumber + index + 1;
+          const suffix = String(nextNumber).padStart(3, '0');
+          const questionId = `q_${degreeCode}_${suffix}`;
+
+          return {
+            id: questionId,
+            degreeId: degree.id,
+            questionText: q.questionText,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            correctAnswer: q.correctAnswer,
+          };
+        });
+
+        await prisma.questionBank.createMany({
+          data: toCreate,
+          skipDuplicates: true,
+        });
+      } catch (aiError) {
+        console.error('AI question generation failed, falling back to existing pool:', aiError);
+        
+      }
+    }
+
+    
+    const pool = await prisma.questionBank.findMany({
+      where: { degreeId: degree.id },
       select: {
         id: true,
         questionText: true,
@@ -30,8 +208,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    // If less than 10 questions available → validation error
-    if (questions.length < 10) {
+    if (pool.length < 10) {
       return res.status(400).json({
         success: false,
         message:
@@ -40,18 +217,34 @@ const getRandomQuestionsByDegree = async (req, res) => {
       });
     }
 
-    // Randomly select EXACTLY 10 questions (Fisher–Yates shuffle in controller)
-    for (let i = questions.length - 1; i > 0; i--) {
+    
+    for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [questions[i], questions[j]] = [questions[j], questions[i]];
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const randomTen = questions.slice(0, 10);
+    const chosen = pool.slice(0, 10);
+
+    await prisma.examQuestionAssignment.createMany({
+      data: chosen.map((q, idx) => ({
+        testResultId: testResult.id,
+        questionId: q.id,
+        order: idx + 1,
+        studentId: loggedInUserId,
+      })),
+      skipDuplicates: true,
+    });
 
     return res.status(200).json({
       success: true,
-      message: 'Random questions fetched successfully',
-      data: randomTen,
+      message: 'Exam questions fetched successfully',
+      data: {
+        applicationId: application.id,
+        degreeId: degree.id,
+        applicationStatus: application.status,
+        testResultId: testResult.id,
+        questions: chosen,
+      },
     });
   } catch (error) {
     console.error('Error fetching random questions by degree:', error);
@@ -76,10 +269,10 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 1. Validate student exists
+    
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { id: true },
+      select: { id: true, email: true, name: true },
     });
 
     if (!student) {
@@ -90,7 +283,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 2. Validate degree exists
+    
     const degree = await prisma.degree.findUnique({
       where: { id: degreeId },
       select: { id: true },
@@ -104,7 +297,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // Basic answers validation + normalization
+    
     const normalizedAnswers = [];
     for (let i = 0; i < answers.length; i++) {
       const entry = answers[i];
@@ -144,7 +337,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 3 & 4. Validate questions belong to degree + fetch correct answers
+    
     const questions = await prisma.questionBank.findMany({
       where: {
         id: { in: uniqueQuestionIds },
@@ -168,7 +361,7 @@ const submitStudentAnswers = async (req, res) => {
       questions.map((q) => [q.id, (q.correctAnswer || '').trim().toUpperCase()])
     );
 
-    // Find the student's application for this degree
+    
     const application = await prisma.application.findFirst({
       where: {
         candidateId: studentId,
@@ -190,7 +383,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // Ensure testResult exists (CandidateAnswer requires testResultId)
+    
     let testResult = await prisma.testResult.findUnique({
       where: { applicationId: application.id },
       select: { id: true, status: true },
@@ -215,7 +408,7 @@ const submitStudentAnswers = async (req, res) => {
       });
     }
 
-    // 5, 6, 7. Compare & save (no total score calculation, no correct answers in response)
+    
     const ops = normalizedAnswers.map((a) => {
       const correctAnswer = correctAnswerByQuestionId.get(a.questionId);
       const isCorrect = a.selectedAnswer === correctAnswer;
@@ -269,10 +462,10 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Validate student exists
+    
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { id: true },
+      select: { id: true, email: true },
     });
 
     if (!student) {
@@ -283,7 +476,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Validate degree exists
+    
     const degree = await prisma.degree.findUnique({
       where: { id: degreeId },
       select: { id: true },
@@ -297,7 +490,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Find the student's latest application for this degree
+    
     const application = await prisma.application.findFirst({
       where: {
         candidateId: studentId,
@@ -319,7 +512,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Fetch test result with all candidate answers
+    
     const testResult = await prisma.testResult.findUnique({
       where: { applicationId: application.id },
       include: {
@@ -339,7 +532,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       });
     }
 
-    // Calculate total score: 10 marks per correct answer
+    
     let correctCount = 0;
     for (let i = 0; i < testResult.candidateAnswers.length; i++) {
       const answer = testResult.candidateAnswers[i];
@@ -350,7 +543,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
 
     const totalScore = correctCount * 10;
 
-    // Save total score using existing attributes (no schema changes)
+    
     const updatedResult = await prisma.testResult.update({
       where: { id: testResult.id },
       data: {
@@ -361,6 +554,24 @@ const calculateFinalScoreAndSave = async (req, res) => {
         obtainedMarks: true,
       },
     });
+
+    
+    try {
+      if (student.email) {
+        const subject = 'Exam Submitted Successfully';
+        const message = `Your exam has been submitted successfully. Your score is ${updatedResult.obtainedMarks}. Please wait for selection confirmation at the end of the intake.`;
+        await sendEmail(student.email, subject, message);
+      }
+    } catch (mailErr) {
+      console.error('Failed to send exam submission score email:', mailErr);
+    }
+
+    
+    try {
+      await updateDegreeRanking(degreeId);
+    } catch (rankErr) {
+      console.error('Ranking update failed:', rankErr);
+    }
 
     return res.status(200).json({
       success: true,
@@ -379,23 +590,62 @@ const calculateFinalScoreAndSave = async (req, res) => {
   }
 };
 
+const recalculateDegreeRankings = async (req, res) => {
+  try {
+    const { degreeId } = req.params;
+    if (!degreeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'degreeId is required',
+        data: null,
+      });
+    }
+
+    await updateDegreeRanking(degreeId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rankings recalculated successfully',
+      data: null,
+    });
+  } catch (error) {
+    console.error('Error recalculating rankings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to recalculate rankings',
+      data: null,
+    });
+  }
+};
+
 
 const getStudentRankings = async (req, res) => {
   try {
-    // Fetch all completed results that have a stored final score
-    const results = await prisma.testResult.findMany({
-      where: {
-        status: 'completed',
-        obtainedMarks: { not: null },
-      },
+    const { degreeId } = req.query || {};
+
+    const rankings = await prisma.ranking.findMany({
+      where: degreeId ? { degreeId: String(degreeId) } : undefined,
+      orderBy: [{ degreeId: 'asc' }, { rank: 'asc' }],
       select: {
-        obtainedMarks: true,
+        rank: true,
+        degreeId: true,
         application: {
           select: {
             candidate: {
               select: {
                 id: true,
                 name: true,
+                email: true,
+              },
+            },
+            program: {
+              select: {
+                name: true,
+              },
+            },
+            testResult: {
+              select: {
+                obtainedMarks: true,
               },
             },
           },
@@ -403,54 +653,63 @@ const getStudentRankings = async (req, res) => {
       },
     });
 
-    if (!results || results.length === 0) {
+    if (!rankings || rankings.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No exam results found',
+        message: 'No rankings found',
         data: null,
       });
     }
 
-    // Reduce to best score per student (dynamic ranking is per student)
-    const bestByStudentId = new Map();
-    for (let i = 0; i < results.length; i++) {
-      const row = results[i];
-      const candidate = row?.application?.candidate;
-      if (!candidate?.id) continue;
+    const ranked = rankings.map((row) => ({
+      rank: row.rank,
+      degreeId: row.degreeId,
+      studentId: row.application.candidate.id,
+      name: row.application.candidate.name || null,
+      score:
+        typeof row.application.testResult?.obtainedMarks === 'number'
+          ? row.application.testResult.obtainedMarks
+          : 0,
+    }));
 
-      const score = typeof row.obtainedMarks === 'number' ? row.obtainedMarks : 0;
-      const existing = bestByStudentId.get(candidate.id);
-
-      if (!existing || score > existing.score) {
-        bestByStudentId.set(candidate.id, {
-          studentId: candidate.id,
-          name: candidate.name || null,
-          score,
-        });
+    
+    try {
+      const byDegree = new Map();
+      for (const row of rankings) {
+        const did = row.degreeId;
+        if (!byDegree.has(did)) byDegree.set(did, []);
+        byDegree.get(did).push(row);
       }
+
+      const emailOps = [];
+      for (const [did, rows] of byDegree.entries()) {
+        const degreeName = rows?.[0]?.application?.program?.name || did;
+        for (const r of rows) {
+          const email = r?.application?.candidate?.email;
+          if (!email) continue;
+
+          const selected = typeof r.rank === 'number' ? r.rank <= 2 : false;
+          const subject = selected ? 'Congratulations!' : 'Application Update';
+          const message = selected
+            ? `Congratulations! You have been selected for ${degreeName}. Please wait for further details from the university.`
+            : `We are sorry, you were not selected for ${degreeName}. Start a new journey with DirectU and explore new opportunities.`;
+
+          emailOps.push(
+            (async () => {
+              try {
+                await sendEmail(email, subject, message);
+              } catch (err) {
+                console.error(`Failed to send ranking email to ${email}:`, err);
+              }
+            })()
+          );
+        }
+      }
+
+      await Promise.all(emailOps);
+    } catch (emailErr) {
+      console.error('Failed to dispatch ranking emails:', emailErr);
     }
-
-    const rankingList = Array.from(bestByStudentId.values()).sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return String(a.studentId).localeCompare(String(b.studentId));
-    });
-
-    // Assign dense ranks (ties share the same rank)
-    let rank = 0;
-    let lastScore = null;
-    const ranked = rankingList.map((entry) => {
-      if (lastScore === null || entry.score !== lastScore) {
-        rank += 1;
-        lastScore = entry.score;
-      }
-
-      return {
-        rank,
-        studentId: entry.studentId,
-        name: entry.name,
-        score: entry.score,
-      };
-    });
 
     return res.status(200).json({
       success: true,
@@ -471,6 +730,7 @@ export {
   getRandomQuestionsByDegree,
   submitStudentAnswers,
   calculateFinalScoreAndSave,
+  recalculateDegreeRankings,
   getStudentRankings,
 };
 

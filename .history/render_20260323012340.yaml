@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: directu-api
+    runtime: node
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set manually in Render dashboard
+      - key: NODE_ENV
+        value: production
+      - key: AI_SERVICE_URL
+        sync: false  # set to your FastAPI Render URL after deploying it
+
+  - type: web
+    name: directu-ai
+    runtime: python
+    rootDir: src/ai-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # same Neon connection string
