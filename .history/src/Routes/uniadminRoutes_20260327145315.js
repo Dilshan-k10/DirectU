@@ -11,7 +11,7 @@ import {
   getDegrees,
   updateDegree,
   getIntakes,
-  getApplicantanalysisResultById,
+  getApplicantanalysisResultById
   getApplicantanalysisFeedbackById,
 } from '../controllers/uniadminController.js';
 import { protect } from '../middleware/authMiddleware.js';
