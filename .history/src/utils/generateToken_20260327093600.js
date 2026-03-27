@@ -14,7 +14,7 @@ export const generateToken = (userId, role, res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 900000, // 15min in milliseconds
+        maxAge: 10000, // 15min
     });
 
     res.cookie('refreshToken', refreshToken, {
