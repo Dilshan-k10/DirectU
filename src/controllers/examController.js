@@ -423,10 +423,12 @@ const submitStudentAnswers = async (req, res) => {
         update: {
           selectedOption: a.selectedAnswer,
           isCorrect,
+          candidateId: studentId,
         },
         create: {
           testResultId: testResult.id,
           questionId: a.questionId,
+          candidateId: studentId,
           selectedOption: a.selectedAnswer,
           isCorrect,
         },
@@ -442,10 +444,19 @@ const submitStudentAnswers = async (req, res) => {
     });
   } catch (error) {
     console.error('Error submitting student answers:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    });
     return res.status(500).json({
       success: false,
       message: 'Failed to submit answers',
-      data: null,
+      data: {
+        error: error.message,
+        details: error.meta?.cause || 'Internal server error',
+      },
     });
   }
 };
