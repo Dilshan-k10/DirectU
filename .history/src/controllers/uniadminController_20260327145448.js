@@ -460,7 +460,6 @@ const getApplicantanalysisFeedbackById = async (req, res) => {
         applicationId: true,
         feedbackType: true,
         message: true,
-        suggestions: true,
         createdAt: true,
       },
     });
