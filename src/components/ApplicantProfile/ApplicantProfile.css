@@ -133,3 +133,59 @@
   text-align: center;
   margin-top: 20px;
 }
+
+/* --- Bottom Action Buttons --- */
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 20px;
+}
+
+.btn-update-status,
+.btn-save {
+  padding: 14px 40px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  letter-spacing: 0.03em;
+  min-width: 180px;
+  text-align: center;
+}
+
+.btn-update-status {
+  background: transparent;
+  border: 1.5px solid rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-update-status:hover {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+  color: #e0d4ff;
+  transform: translateY(-1px);
+}
+
+.btn-icon {
+  font-size: 1.1rem;
+}
+
+.btn-save {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+
+.btn-save:hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 6px 25px rgba(124, 58, 237, 0.45);
+  transform: translateY(-1px);
+}

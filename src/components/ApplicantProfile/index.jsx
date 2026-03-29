@@ -46,6 +46,17 @@ const ApplicantProfileModal = ({ onClose }) => {
             <p className="placeholder-text">Documents</p>
           </div>
         </div>
+
+        {/* Bottom Action Buttons */}
+        <div className="modal-actions">
+          <button className="btn-update-status" id="btn-update-status">
+            <span className="btn-icon">↻</span>
+            Update Status
+          </button>
+          <button className="btn-save" id="btn-save">
+            SAVE
+          </button>
+        </div>
       </div>
     </div>
   );
