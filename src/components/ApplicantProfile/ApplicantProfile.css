@@ -246,6 +246,147 @@
   font-size: 0.9rem;
 }
 
+/* --- Center Panel Styles --- */
+.modal-col-center {
+  padding: 0 10px;
+}
+
+.section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin: 0 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.history-details-section {
+  margin-bottom: 24px;
+}
+
+.history-degree {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px;
+}
+
+.history-university {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin: 0 0 8px;
+}
+
+.history-gpa {
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.gpa-value {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.center-flex-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.ai-score-chart {
+  flex-shrink: 0;
+}
+
+.circular-progress {
+  transform: rotate(-90deg);
+}
+
+.background-circle {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+.progress-circle {
+  stroke: url(#progressGradient);
+  stroke: #7c3aed; /* Fallback */
+}
+
+.score-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  fill: #ffffff;
+  transform: rotate(90deg) translate(0px, 0px);
+  transform-origin: center;
+}
+
+.analysis-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.breakdown-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.category-name {
+  color: #94a3b8;
+}
+
+.category-score {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.system-flags-section {
+  padding-top: 10px;
+}
+
+.flags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.flag-icon {
+  font-size: 1rem;
+}
+
+.verified .flag-label {
+  color: #e2e8f0;
+}
+
+.pending .flag-label {
+  color: #f59e0b;
+}
+
+
 
 /* --- Bottom Action Buttons --- */
 .modal-actions {

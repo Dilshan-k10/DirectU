@@ -3,6 +3,10 @@ import './ApplicantProfile.css';
 import ProfileHeader from './ProfileHeader';
 import ContactInfo from './ContactInfo';
 import StatusBadge from './StatusBadge';
+import HistoryDetails from './HistoryDetails';
+import AIScoreChart from './AIScoreChart';
+import AnalysisBreakdown from './AnalysisBreakdown';
+import SystemFlags from './SystemFlags';
 
 /**
  * ApplicantProfileModal - Main modal component for viewing applicant details
@@ -43,7 +47,20 @@ const ApplicantProfileModal = ({ onClose }) => {
 
           {/* Center Column - Details & AI Analysis */}
           <div className="modal-col modal-col-center">
-            <p className="placeholder-text">AI Analysis</p>
+            <HistoryDetails
+              degree="Bachelor of Science in Computer Science"
+              university="University of Tech"
+              gpa="3.8/4.0"
+            />
+            <div className="center-flex-group">
+              <AIScoreChart score={92} />
+              <AnalysisBreakdown
+                academic={95}
+                experience={88}
+                potential={94}
+              />
+            </div>
+            <SystemFlags />
           </div>
 
           {/* Right Column - Documents */}
