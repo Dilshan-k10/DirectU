@@ -506,9 +506,10 @@
 
 .btn-update-status:hover {
   border-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(139, 92, 246, 0.12);
   color: #e0d4ff;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
 }
 
 .btn-icon {
@@ -520,10 +521,29 @@
   border: none;
   color: #ffffff;
   box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-save:hover {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  box-shadow: 0 6px 25px rgba(124, 58, 237, 0.45);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(124, 58, 237, 0.5), 0 0 15px rgba(124, 58, 237, 0.3);
+  transform: translateY(-2px);
 }
+
+.btn-save::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-save:hover::after {
+  opacity: 1;
+}
+
