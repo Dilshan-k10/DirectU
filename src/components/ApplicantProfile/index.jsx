@@ -5,11 +5,29 @@ import './ApplicantProfile.css';
  * ApplicantProfileModal - Main modal component for viewing applicant details
  * Displays comprehensive profile info including AI analysis and documents
  */
-const ApplicantProfileModal = () => {
+const ApplicantProfileModal = ({ onClose }) => {
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose?.();
+    }
+  };
+
   return (
-    <div className="applicant-modal-overlay">
+    <div className="applicant-modal-overlay" onClick={handleOverlayClick}>
       <div className="applicant-modal-container">
-        <p>Applicant Profile Modal</p>
+        {/* Modal Header */}
+        <div className="modal-header">
+          <h1 className="modal-title">
+            Applicant Profile: <span className="modal-title-name">Alexander Thorne</span>
+          </h1>
+          <button
+            className="modal-close-btn"
+            onClick={() => onClose?.()}
+            aria-label="Close modal"
+          >
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   );
