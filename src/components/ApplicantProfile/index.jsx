@@ -28,6 +28,24 @@ const ApplicantProfileModal = ({ onClose }) => {
             ✕
           </button>
         </div>
+
+        {/* Modal Body - Three Column Layout */}
+        <div className="modal-body">
+          {/* Left Column - Profile Card */}
+          <div className="modal-col modal-col-left">
+            <p className="placeholder-text">Profile Panel</p>
+          </div>
+
+          {/* Center Column - Details & AI Analysis */}
+          <div className="modal-col modal-col-center">
+            <p className="placeholder-text">AI Analysis</p>
+          </div>
+
+          {/* Right Column - Documents */}
+          <div className="modal-col modal-col-right">
+            <p className="placeholder-text">Documents</p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -95,3 +95,41 @@
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
+
+/* --- Modal Body (Three Column Layout) --- */
+.modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: 24px;
+  flex: 1;
+}
+
+.modal-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-col-left {
+  background: linear-gradient(160deg, #1e2548, #171c35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 24px 20px;
+}
+
+.modal-col-center {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-col-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.placeholder-text {
+  color: #64748b;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 20px;
+}
