@@ -1,4 +1,5 @@
 import React from 'react';
+import './ApplicantProfile.css';
 
 /**
  * ApplicantProfileModal - Main modal component for viewing applicant details

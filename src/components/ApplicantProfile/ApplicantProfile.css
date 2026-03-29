@@ -1,0 +1,54 @@
+/* ============================================
+   Applicant Profile Modal - Dark Theme Styles
+   ============================================ */
+
+/* --- Overlay --- */
+.applicant-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: overlayFadeIn 0.3s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* --- Container --- */
+.applicant-modal-container {
+  background: linear-gradient(145deg, #1a1f3c, #141829);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  width: 90%;
+  max-width: 960px;
+  min-height: 520px;
+  padding: 32px 36px;
+  position: relative;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(99, 102, 241, 0.08);
+  animation: modalSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #e2e8f0;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
