@@ -13,3 +13,31 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id              String     @id @default(cuid())
+  name            String
+  email           String     @unique
+  phone           String?
+  status          String     @default("UNDER REVIEW")
+  degree          String
+  university      String
+  gpa             String
+  aiScore         Int        @default(0)
+  academicScore   Int        @default(0)
+  experienceScore Int        @default(0)
+  potentialScore  Int        @default(0)
+  documents       Document[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  size      Float
+  type      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
