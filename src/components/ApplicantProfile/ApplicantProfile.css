@@ -226,10 +226,21 @@
 }
 
 .status-under-review {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   color: #f59e0b;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
+  transition: all 0.2s ease;
 }
+
+.status-under-review:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.6);
+  transform: translateY(-1px);
+}
+
 
 .status-badge-icon {
   font-size: 0.9rem;
