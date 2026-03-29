@@ -1,5 +1,8 @@
 import React from 'react';
 import './ApplicantProfile.css';
+import ProfileHeader from './ProfileHeader';
+import ContactInfo from './ContactInfo';
+import StatusBadge from './StatusBadge';
 
 /**
  * ApplicantProfileModal - Main modal component for viewing applicant details
@@ -33,7 +36,9 @@ const ApplicantProfileModal = ({ onClose }) => {
         <div className="modal-body">
           {/* Left Column - Profile Card */}
           <div className="modal-col modal-col-left">
-            <p className="placeholder-text">Profile Panel</p>
+            <ProfileHeader name="Alexander Thorne" />
+            <ContactInfo email="a.thorne@email.com" phone="+1 555 1234 567" />
+            <StatusBadge status="UNDER REVIEW" />
           </div>
 
           {/* Center Column - Details & AI Analysis */}
