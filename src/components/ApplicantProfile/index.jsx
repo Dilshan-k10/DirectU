@@ -7,6 +7,7 @@ import HistoryDetails from './HistoryDetails';
 import AIScoreChart from './AIScoreChart';
 import AnalysisBreakdown from './AnalysisBreakdown';
 import SystemFlags from './SystemFlags';
+import DocumentList from './DocumentList';
 
 /**
  * ApplicantProfileModal - Main modal component for viewing applicant details
@@ -65,7 +66,14 @@ const ApplicantProfileModal = ({ onClose }) => {
 
           {/* Right Column - Documents */}
           <div className="modal-col modal-col-right">
-            <p className="placeholder-text">Documents</p>
+            <DocumentList
+              documents={[
+                { name: 'CV.pdf', size: 35.3, type: 'pdf' },
+                { name: 'Transcript.pdf', size: 33.7, type: 'pdf' },
+                { name: 'Statement.pdf', size: 32.2, type: 'pdf' },
+                { name: 'Certificates.zip', size: 33.7, type: 'zip' },
+              ]}
+            />
           </div>
         </div>
 

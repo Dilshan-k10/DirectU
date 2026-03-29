@@ -386,6 +386,90 @@
   color: #f59e0b;
 }
 
+/* --- Right Panel Documents Styles --- */
+.document-list-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.document-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.doc-info-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doc-icon {
+  font-size: 1.4rem;
+  opacity: 0.9;
+}
+
+.doc-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.doc-size {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.doc-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.doc-btn {
+  background: #2d365e;
+  border: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #c4cbe4;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.doc-btn:hover {
+  background: #3b4578;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+
 
 
 /* --- Bottom Action Buttons --- */
