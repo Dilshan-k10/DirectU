@@ -547,3 +547,34 @@
   opacity: 1;
 }
 
+/* --- Custom Scrollbar for Right Panel --- */
+.modal-col-right {
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.modal-col-right::-webkit-scrollbar {
+  width: 5px;
+}
+
+.modal-col-right::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+
+.modal-col-right::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 10px;
+}
+
+.modal-col-right::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.5);
+}
+
+/* --- Global Theme Polish --- */
+::selection {
+  background: rgba(124, 58, 237, 0.35);
+  color: #ffffff;
+}
+
