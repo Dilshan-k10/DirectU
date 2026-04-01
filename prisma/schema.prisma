@@ -22,8 +22,9 @@ model User {
 
   createdAt DateTime @default(now())
 
-  degrees      Degree[]
-  applications Application[]
+  degrees           Degree[]
+  applications      Application[]
+  candidateAnswers  CandidateAnswer[]
 }
 
 model Degree {
@@ -277,6 +278,7 @@ model CandidateAnswer {
   id             String   @id @default(uuid())
   testResultId   String   @map("test_result_id")
   questionId     String   @map("question_id")
+  candidateId    String   @map("candidate_id")
   selectedOption String?  @map("selected_option") @db.Char(1)
   isFlagged      Boolean  @default(false) @map("is_flagged")
   isCorrect      Boolean? @map("is_correct")
@@ -285,9 +287,11 @@ model CandidateAnswer {
 
   testResult TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
   question   QuestionBank @relation(fields: [questionId], references: [id])
+  candidate  User         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@unique([testResultId, questionId])
   @@index([testResultId], map: "idx_candidate_answers_test")
+  @@index([candidateId], map: "idx_candidate_answers_candidate")
   @@map("candidate_answers")
 }
 
