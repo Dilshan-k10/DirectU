@@ -120,46 +120,37 @@ const getRandomQuestionsByDegree = async (req, res) => {
     }
 
     
-    const questionCount = await prisma.questionBank.count({
-      where: { degreeId: degree.id },
-    });
-    const generationAttempts = Math.floor(questionCount / 30);
+    const degreeCodeMatch = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
+    const degreeCode = degreeCodeMatch?.[1]?.toLowerCase() || 'gen';
 
-    
+    const lastAiQuestion = await prisma.questionBank.findFirst({
+      where: {
+        degreeId: degree.id,
+        id: {
+          startsWith: `q_${degreeCode}_`,
+        },
+      },
+      select: { id: true },
+      orderBy: { id: 'desc' },
+    });
+
+    let lastNumber = 0;
+    if (lastAiQuestion?.id) {
+      const parts = String(lastAiQuestion.id).split('_');
+      const maybeNum = parts[parts.length - 1];
+      const parsed = parseInt(maybeNum, 10);
+      if (!Number.isNaN(parsed)) {
+        lastNumber = parsed;
+      }
+    }
+
+    const generationAttempts = Math.floor(lastNumber / 30);
+    let generationError = null;
+
     if (generationAttempts < 10) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
 
-        
-        let degreeCode = 'gen';
-        const match = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
-        if (match && match[1]) {
-          degreeCode = match[1].toLowerCase();
-        }
-
-        
-        const lastAiQuestion = await prisma.questionBank.findFirst({
-          where: {
-            degreeId: degree.id,
-            id: {
-              startsWith: `q_${degreeCode}_`,
-            },
-          },
-          select: { id: true },
-          orderBy: { id: 'desc' },
-        });
-
-        let lastNumber = 0;
-        if (lastAiQuestion?.id) {
-          const parts = String(lastAiQuestion.id).split('_');
-          const maybeNum = parts[parts.length - 1];
-          const parsed = parseInt(maybeNum, 10);
-          if (!Number.isNaN(parsed)) {
-            lastNumber = parsed;
-          }
-        }
-
-        
         const toCreate = generated.map((q, index) => {
           const nextNumber = lastNumber + index + 1;
           const suffix = String(nextNumber).padStart(3, '0');
@@ -182,12 +173,11 @@ const getRandomQuestionsByDegree = async (req, res) => {
           skipDuplicates: true,
         });
       } catch (aiError) {
-        console.error('AI question generation failed, falling back to existing pool:', aiError);
-        
+        generationError = aiError;
+        console.error('AI question generation failed for degree', degree.id, aiError);
       }
     }
 
-    
     const pool = await prisma.questionBank.findMany({
       where: { degreeId: degree.id },
       select: {
@@ -201,6 +191,15 @@ const getRandomQuestionsByDegree = async (req, res) => {
     });
 
     if (pool.length < 30) {
+      if (generationError) {
+        return res.status(500).json({
+          success: false,
+          message:
+            'AI question generation failed, and there are not enough questions in the database to continue. Please retry.',
+          data: null,
+        });
+      }
+
       return res.status(400).json({
         success: false,
         message:
