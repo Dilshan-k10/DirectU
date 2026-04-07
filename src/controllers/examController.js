@@ -120,21 +120,13 @@ const getRandomQuestionsByDegree = async (req, res) => {
     }
 
     
-    const served = await prisma.examQuestionAssignment.findMany({
-      where: {
-        testResult: {
-          application: {
-            programId: degree.id,
-          },
-        },
-      },
-      distinct: ['testResultId'],
-      select: { testResultId: true },
+    const questionCount = await prisma.questionBank.count({
+      where: { degreeId: degree.id },
     });
-    const servedCount = served.length;
+    const generationAttempts = Math.floor(questionCount / 30);
 
     
-    if (servedCount < 20) {
+    if (generationAttempts < 10) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
 
