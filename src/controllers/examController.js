@@ -106,16 +106,10 @@ const getRandomQuestionsByDegree = async (req, res) => {
     });
 
     if (existingAssignments.length === 30) {
-      return res.status(200).json({
-        success: true,
-        message: 'Exam questions fetched successfully',
-        data: {
-          applicationId: application.id,
-          degreeId: degree.id,
-          applicationStatus: application.status,
-          testResultId: testResult.id,
-          questions: existingAssignments.map((a) => a.question),
-        },
+      return res.status(403).json({
+        success: false,
+        message: 'You already sat for this exam. You cannot sit for another exam.',
+        data: null,
       });
     }
 
