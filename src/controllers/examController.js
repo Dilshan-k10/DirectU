@@ -195,6 +195,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
         return res.status(500).json({
           success: false,
           message:
+            generationError.message ||
             'AI question generation failed, and there are not enough questions in the database to continue. Please retry.',
           data: null,
         });

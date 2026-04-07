@@ -162,7 +162,13 @@ export async function generateMcqsForDegree({ degreeName }) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    throw new Error(`Gemini API failed (${resp.status}): ${text || resp.statusText}`);
+    const message = `Gemini API failed (${resp.status}): ${text || resp.statusText}`;
+    if (resp.status === 403) {
+      throw new Error(
+        `${message} Please verify your GEMINI_API_KEY is valid and has access to the Gemini API.`
+      );
+    }
+    throw new Error(message);
   }
 
   const data = await resp.json();
