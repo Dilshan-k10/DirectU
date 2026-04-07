@@ -168,7 +168,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
           skipDuplicates: true,
         });
 
-        newlyGeneratedQuestions = toCreate;
+        newlyGeneratedQuestions = toCreate.sort((a, b) => a.id.localeCompare(b.id));
       } catch (aiError) {
         generationError = aiError;
         console.error('AI question generation failed for degree', degree.id, aiError);
@@ -177,7 +177,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
 
     let chosen = [];
     if (newlyGeneratedQuestions.length === 30) {
-      // Use the newly generated questions for this attempt
+      // Use the newly generated questions for this attempt, ordered by question id
       chosen = newlyGeneratedQuestions;
     } else {
       // Fallback to existing pool if generation failed or limit reached
