@@ -105,7 +105,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    if (existingAssignments.length === 10) {
+    if (existingAssignments.length === 30) {
       return res.status(200).json({
         success: true,
         message: 'Exam questions fetched successfully',
@@ -208,11 +208,11 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    if (pool.length < 10) {
+    if (pool.length < 30) {
       return res.status(400).json({
         success: false,
         message:
-          'Not enough questions available for this degree. At least 10 questions are required.',
+          'Not enough questions available for this degree. At least 30 questions are required.',
         data: null,
       });
     }
@@ -223,7 +223,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const chosen = pool.slice(0, 10);
+    const chosen = pool.slice(0, 30);
 
     await prisma.examQuestionAssignment.createMany({
       data: chosen.map((q, idx) => ({

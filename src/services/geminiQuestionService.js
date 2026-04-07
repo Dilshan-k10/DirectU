@@ -28,7 +28,7 @@ function buildPrompt(degreeName) {
   const guidance = buildDegreeGuidance(degreeName);
 
   return [
-    `Generate exactly 10 realistic multiple-choice questions (MCQs) for a university entrance exam for the degree "${degreeName}".`,
+    `Generate exactly 30 realistic multiple-choice questions (MCQs) for a university entrance exam for the degree "${degreeName}".`,
     'Difficulty: medium.',
     guidance,
     'Each question must include: question, 4 options, and the correct answer.',
@@ -104,8 +104,8 @@ function normalizeCorrectAnswer(answerRaw, optionsRaw) {
 
 function validateAndMapQuestions(payload) {
   const questions = payload?.questions;
-  if (!Array.isArray(questions) || questions.length !== 10) {
-    throw new Error('AI must return exactly 10 questions');
+  if (!Array.isArray(questions) || questions.length !== 30) {
+    throw new Error('AI must return exactly 30 questions');
   }
 
   return questions.map((q, i) => {
