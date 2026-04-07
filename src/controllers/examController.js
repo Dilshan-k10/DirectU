@@ -146,6 +146,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
 
     const generationAttempts = Math.floor(lastNumber / 30);
     let generationError = null;
+    let newlyGeneratedQuestions = [];
 
     if (generationAttempts < 10) {
       try {
@@ -172,50 +173,59 @@ const getRandomQuestionsByDegree = async (req, res) => {
           data: toCreate,
           skipDuplicates: true,
         });
+
+        newlyGeneratedQuestions = toCreate;
       } catch (aiError) {
         generationError = aiError;
         console.error('AI question generation failed for degree', degree.id, aiError);
       }
     }
 
-    const pool = await prisma.questionBank.findMany({
-      where: { degreeId: degree.id },
-      select: {
-        id: true,
-        questionText: true,
-        optionA: true,
-        optionB: true,
-        optionC: true,
-        optionD: true,
-      },
-    });
+    let chosen = [];
+    if (newlyGeneratedQuestions.length === 30) {
+      // Use the newly generated questions for this attempt
+      chosen = newlyGeneratedQuestions;
+    } else {
+      // Fallback to existing pool if generation failed or limit reached
+      const pool = await prisma.questionBank.findMany({
+        where: { degreeId: degree.id },
+        select: {
+          id: true,
+          questionText: true,
+          optionA: true,
+          optionB: true,
+          optionC: true,
+          optionD: true,
+        },
+      });
 
-    if (pool.length < 30) {
-      if (generationError) {
-        return res.status(500).json({
+      if (pool.length < 30) {
+        if (generationError) {
+          return res.status(500).json({
+            success: false,
+            message:
+              generationError.message ||
+              'AI question generation failed, and there are not enough questions in the database to continue. Please retry.',
+            data: null,
+          });
+        }
+
+        return res.status(400).json({
           success: false,
           message:
-            generationError.message ||
-            'AI question generation failed, and there are not enough questions in the database to continue. Please retry.',
+            'Not enough questions available for this degree. At least 30 questions are required.',
           data: null,
         });
       }
 
-      return res.status(400).json({
-        success: false,
-        message:
-          'Not enough questions available for this degree. At least 30 questions are required.',
-        data: null,
-      });
-    }
+      // Shuffle and select 30 from existing pool
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
 
-    
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
+      chosen = pool.slice(0, 30);
     }
-
-    const chosen = pool.slice(0, 30);
 
     await prisma.examQuestionAssignment.createMany({
       data: chosen.map((q, idx) => ({
