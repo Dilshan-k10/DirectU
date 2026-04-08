@@ -160,6 +160,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
             optionC: q.optionC,
             optionD: q.optionD,
             correctAnswer: q.correctAnswer,
+            difficulty: q.difficulty,
           };
         });
 
@@ -190,6 +191,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
           optionB: true,
           optionC: true,
           optionD: true,
+          difficulty: true,
         },
       });
 
@@ -212,13 +214,50 @@ const getRandomQuestionsByDegree = async (req, res) => {
         });
       }
 
-      // Shuffle and select 30 from existing pool
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
+      // Group questions by difficulty
+      const grouped = { EASY: [], MEDIUM: [], HARD: [] };
+      for (const q of pool) {
+        const diff = q.difficulty || 'MEDIUM'; // fallback for old questions
+        if (grouped[diff]) {
+          grouped[diff].push(q);
+        } else {
+          grouped.MEDIUM.push(q); // fallback
+        }
       }
 
-      chosen = pool.slice(0, 30);
+      // Desired counts: 40% easy (12), 40% medium (12), 20% hard (6)
+      const targetCounts = { EASY: 12, MEDIUM: 12, HARD: 6 };
+      const selected = [];
+
+      // For each difficulty, shuffle and take up to target
+      for (const [diff, questions] of Object.entries(grouped)) {
+        const target = targetCounts[diff] || 0;
+        if (questions.length <= target) {
+          selected.push(...questions);
+        } else {
+          // Shuffle and take target
+          for (let i = questions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [questions[i], questions[j]] = [questions[j], questions[i]];
+          }
+          selected.push(...questions.slice(0, target));
+        }
+      }
+
+      // If not enough, fill from available
+      const totalSelected = selected.length;
+      if (totalSelected < 30) {
+        const remaining = 30 - totalSelected;
+        const allRemaining = pool.filter(q => !selected.includes(q));
+        // Shuffle remaining
+        for (let i = allRemaining.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allRemaining[i], allRemaining[j]] = [allRemaining[j], allRemaining[i]];
+        }
+        selected.push(...allRemaining.slice(0, remaining));
+      }
+
+      chosen = selected;
     }
 
     await prisma.examQuestionAssignment.createMany({

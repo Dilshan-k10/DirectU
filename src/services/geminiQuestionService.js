@@ -29,9 +29,9 @@ function buildPrompt(degreeName) {
 
   return [
     `Generate exactly 30 realistic multiple-choice questions (MCQs) for a university entrance exam for the degree "${degreeName}".`,
-    'Difficulty: medium.',
+    'Balance the difficulties: approximately 40% easy, 40% medium, 20% hard.',
     guidance,
-    'Each question must include: question, 4 options, and the correct answer.',
+    'Each question must include: question, 4 options, the correct answer, and difficulty level (EASY, MEDIUM, or HARD).',
     'Return ONLY valid JSON (no markdown, no code fences, no extra text).',
     'JSON format:',
     JSON.stringify(
@@ -42,6 +42,7 @@ function buildPrompt(degreeName) {
             question: 'Question text',
             options: ['Option A', 'Option B', 'Option C', 'Option D'],
             answer: 'Option B',
+            difficulty: 'MEDIUM',
           },
         ],
       },
@@ -124,6 +125,12 @@ function validateAndMapQuestions(payload) {
 
     const correctAnswer = normalizeCorrectAnswer(q?.answer, options);
 
+    const difficultyRaw = String(q?.difficulty || '').trim().toUpperCase();
+    let difficulty = 'MEDIUM'; // default
+    if (['EASY', 'MEDIUM', 'HARD'].includes(difficultyRaw)) {
+      difficulty = difficultyRaw;
+    }
+
     return {
       questionText,
       optionA: oA,
@@ -131,6 +138,7 @@ function validateAndMapQuestions(payload) {
       optionC: oC,
       optionD: oD,
       correctAnswer,
+      difficulty,
     };
   });
 }
