@@ -266,6 +266,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
         questionId: q.id,
         order: idx + 1,
         studentId: loggedInUserId,
+        difficulty: q.difficulty || 'MEDIUM',
       })),
       skipDuplicates: true,
     });
