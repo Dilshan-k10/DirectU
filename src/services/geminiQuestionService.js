@@ -45,6 +45,8 @@ function buildDegreeGuidance(degreeName) {
     'Focus on realistic, general entrance-exam questions related to the degree field. ' +
     'Avoid overly technical, specialized, or advanced university-level questions.'
   );
+}
+
 /**
  * Constructs the complete prompt for Gemini AI to generate MCQs.
  *
@@ -80,6 +82,8 @@ function buildPrompt(degreeName) {
       2
     ),
   ].join('\n');
+}
+
 /**
  * Removes markdown code fences from AI response text.
  *
@@ -96,6 +100,8 @@ function stripCodeFences(text) {
     return s.replace(/^```[a-zA-Z]*\s*/m, '').replace(/```$/m, '').trim();
   }
   return s;
+}
+
 /**
  * Parses JSON response from Gemini AI.
  *
@@ -122,6 +128,8 @@ function parseGeminiJson(rawText) {
     }
     throw new Error('Invalid JSON returned by AI');
   }
+}
+
 /**
  * Normalizes the correct answer from AI response to A, B, C, or D format.
  *
@@ -155,6 +163,8 @@ function normalizeCorrectAnswer(answerRaw, optionsRaw) {
   if (idx2 === 3) return 'D';
 
   throw new Error('AI answer does not match any option');
+}
+
 /**
  * Validates and maps AI-generated questions to standardized format.
  *
@@ -204,6 +214,8 @@ function validateAndMapQuestions(payload) {
       difficulty,
     };
   });
+}
+
 /**
  * Generates 30 multiple-choice questions for a degree using Gemini AI.
  *

@@ -324,6 +324,8 @@ const getRandomQuestionsByDegree = async (req, res) => {
       data: null,
     });
   }
+};
+
 /**
  * Submits student answers for an exam.
  *
@@ -546,6 +548,8 @@ const submitStudentAnswers = async (req, res) => {
       },
     });
   }
+};
+
 /**
  * Calculates and saves the final score for a completed exam.
  *
@@ -702,6 +706,8 @@ const calculateFinalScoreAndSave = async (req, res) => {
       data: null,
     });
   }
+};
+
 /**
  * Recalculates rankings for all students in a specific degree.
  *
@@ -742,6 +748,8 @@ const recalculateDegreeRankings = async (req, res) => {
       data: null,
     });
   }
+};
+
 /**
  * Retrieves student rankings for degrees and sends notification emails.
  *
