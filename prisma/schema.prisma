@@ -215,6 +215,12 @@ enum Priority {
   low
 }
 
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
 model QuestionBank {
   id            String @id @default(uuid())
   degreeId      String @map("degree_id")
@@ -224,6 +230,7 @@ model QuestionBank {
   optionC       String @map("option_c")
   optionD       String @map("option_d")
   correctAnswer String @map("correct_answer")
+  difficulty    DifficultyLevel @default(MEDIUM)
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -261,6 +268,7 @@ model ExamQuestionAssignment {
   questionId   String   @map("question_id")
   order        Int?
   studentId    String?  @map("student_id")
+  difficulty   DifficultyLevel @default(MEDIUM)
 
   createdAt DateTime @default(now()) @map("created_at")
 

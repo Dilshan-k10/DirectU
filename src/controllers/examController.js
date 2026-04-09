@@ -105,69 +105,47 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    if (existingAssignments.length === 10) {
-      return res.status(200).json({
-        success: true,
-        message: 'Exam questions fetched successfully',
-        data: {
-          applicationId: application.id,
-          degreeId: degree.id,
-          applicationStatus: application.status,
-          testResultId: testResult.id,
-          questions: existingAssignments.map((a) => a.question),
-        },
+    if (existingAssignments.length === 30) {
+      return res.status(403).json({
+        success: false,
+        message: 'You already sat for this exam. You cannot sit for another exam.',
+        data: null,
       });
     }
 
     
-    const served = await prisma.examQuestionAssignment.findMany({
+    const degreeCodeMatch = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
+    const degreeCode = degreeCodeMatch?.[1]?.toLowerCase() || 'gen';
+
+    const lastAiQuestion = await prisma.questionBank.findFirst({
       where: {
-        testResult: {
-          application: {
-            programId: degree.id,
-          },
+        degreeId: degree.id,
+        id: {
+          startsWith: `q_${degreeCode}_`,
         },
       },
-      distinct: ['testResultId'],
-      select: { testResultId: true },
+      select: { id: true },
+      orderBy: { id: 'desc' },
     });
-    const servedCount = served.length;
 
-    
-    if (servedCount < 20) {
+    let lastNumber = 0;
+    if (lastAiQuestion?.id) {
+      const parts = String(lastAiQuestion.id).split('_');
+      const maybeNum = parts[parts.length - 1];
+      const parsed = parseInt(maybeNum, 10);
+      if (!Number.isNaN(parsed)) {
+        lastNumber = parsed;
+      }
+    }
+
+    const generationAttempts = Math.floor(lastNumber / 30);
+    let generationError = null;
+    let newlyGeneratedQuestions = [];
+
+    if (generationAttempts < 10) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
 
-        
-        let degreeCode = 'gen';
-        const match = /^deg_([a-zA-Z]+)_/.exec(degree.id || '');
-        if (match && match[1]) {
-          degreeCode = match[1].toLowerCase();
-        }
-
-        
-        const lastAiQuestion = await prisma.questionBank.findFirst({
-          where: {
-            degreeId: degree.id,
-            id: {
-              startsWith: `q_${degreeCode}_`,
-            },
-          },
-          select: { id: true },
-          orderBy: { id: 'desc' },
-        });
-
-        let lastNumber = 0;
-        if (lastAiQuestion?.id) {
-          const parts = String(lastAiQuestion.id).split('_');
-          const maybeNum = parts[parts.length - 1];
-          const parsed = parseInt(maybeNum, 10);
-          if (!Number.isNaN(parsed)) {
-            lastNumber = parsed;
-          }
-        }
-
-        
         const toCreate = generated.map((q, index) => {
           const nextNumber = lastNumber + index + 1;
           const suffix = String(nextNumber).padStart(3, '0');
@@ -182,6 +160,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
             optionC: q.optionC,
             optionD: q.optionD,
             correctAnswer: q.correctAnswer,
+            difficulty: q.difficulty,
           };
         });
 
@@ -189,41 +168,97 @@ const getRandomQuestionsByDegree = async (req, res) => {
           data: toCreate,
           skipDuplicates: true,
         });
+
+        newlyGeneratedQuestions = toCreate.sort((a, b) => a.id.localeCompare(b.id));
       } catch (aiError) {
-        console.error('AI question generation failed, falling back to existing pool:', aiError);
-        
+        generationError = aiError;
+        console.error('AI question generation failed for degree', degree.id, aiError);
       }
     }
 
-    
-    const pool = await prisma.questionBank.findMany({
-      where: { degreeId: degree.id },
-      select: {
-        id: true,
-        questionText: true,
-        optionA: true,
-        optionB: true,
-        optionC: true,
-        optionD: true,
-      },
-    });
-
-    if (pool.length < 10) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Not enough questions available for this degree. At least 10 questions are required.',
-        data: null,
+    let chosen = [];
+    if (newlyGeneratedQuestions.length === 30) {
+      // Use the newly generated questions for this attempt, ordered by question id
+      chosen = newlyGeneratedQuestions;
+    } else {
+      // Fallback to existing pool if generation failed or limit reached
+      const pool = await prisma.questionBank.findMany({
+        where: { degreeId: degree.id },
+        select: {
+          id: true,
+          questionText: true,
+          optionA: true,
+          optionB: true,
+          optionC: true,
+          optionD: true,
+          difficulty: true,
+        },
       });
-    }
 
-    
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
+      if (pool.length < 30) {
+        if (generationError) {
+          return res.status(500).json({
+            success: false,
+            message:
+              generationError.message ||
+              'AI question generation failed, and there are not enough questions in the database to continue. Please retry.',
+            data: null,
+          });
+        }
 
-    const chosen = pool.slice(0, 10);
+        return res.status(400).json({
+          success: false,
+          message:
+            'Not enough questions available for this degree. At least 30 questions are required.',
+          data: null,
+        });
+      }
+
+      // Group questions by difficulty
+      const grouped = { EASY: [], MEDIUM: [], HARD: [] };
+      for (const q of pool) {
+        const diff = q.difficulty || 'MEDIUM'; // fallback for old questions
+        if (grouped[diff]) {
+          grouped[diff].push(q);
+        } else {
+          grouped.MEDIUM.push(q); // fallback
+        }
+      }
+
+      // Desired counts: 40% easy (12), 40% medium (12), 20% hard (6)
+      const targetCounts = { EASY: 12, MEDIUM: 12, HARD: 6 };
+      const selected = [];
+
+      // For each difficulty, shuffle and take up to target
+      for (const [diff, questions] of Object.entries(grouped)) {
+        const target = targetCounts[diff] || 0;
+        if (questions.length <= target) {
+          selected.push(...questions);
+        } else {
+          // Shuffle and take target
+          for (let i = questions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [questions[i], questions[j]] = [questions[j], questions[i]];
+          }
+          selected.push(...questions.slice(0, target));
+        }
+      }
+
+      // If not enough, fill from available
+      const totalSelected = selected.length;
+      if (totalSelected < 30) {
+        const remaining = 30 - totalSelected;
+        const allRemaining = pool.filter(q => !selected.includes(q));
+        // Shuffle remaining
+        for (let i = allRemaining.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allRemaining[i], allRemaining[j]] = [allRemaining[j], allRemaining[i]];
+        }
+        selected.push(...allRemaining.slice(0, remaining));
+      }
+
+      chosen = selected;
+    }
 
     await prisma.examQuestionAssignment.createMany({
       data: chosen.map((q, idx) => ({
@@ -231,6 +266,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
         questionId: q.id,
         order: idx + 1,
         studentId: loggedInUserId,
+        difficulty: q.difficulty || 'MEDIUM',
       })),
       skipDuplicates: true,
     });

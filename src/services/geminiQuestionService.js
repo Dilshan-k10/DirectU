@@ -28,10 +28,10 @@ function buildPrompt(degreeName) {
   const guidance = buildDegreeGuidance(degreeName);
 
   return [
-    `Generate exactly 10 realistic multiple-choice questions (MCQs) for a university entrance exam for the degree "${degreeName}".`,
-    'Difficulty: medium.',
+    `Generate exactly 30 realistic multiple-choice questions (MCQs) for a university entrance exam for the degree "${degreeName}".`,
+    'Balance the difficulties: approximately 40% easy, 40% medium, 20% hard.',
     guidance,
-    'Each question must include: question, 4 options, and the correct answer.',
+    'Each question must include: question, 4 options, the correct answer, and difficulty level (EASY, MEDIUM, or HARD).',
     'Return ONLY valid JSON (no markdown, no code fences, no extra text).',
     'JSON format:',
     JSON.stringify(
@@ -42,6 +42,7 @@ function buildPrompt(degreeName) {
             question: 'Question text',
             options: ['Option A', 'Option B', 'Option C', 'Option D'],
             answer: 'Option B',
+            difficulty: 'MEDIUM',
           },
         ],
       },
@@ -104,8 +105,8 @@ function normalizeCorrectAnswer(answerRaw, optionsRaw) {
 
 function validateAndMapQuestions(payload) {
   const questions = payload?.questions;
-  if (!Array.isArray(questions) || questions.length !== 10) {
-    throw new Error('AI must return exactly 10 questions');
+  if (!Array.isArray(questions) || questions.length !== 30) {
+    throw new Error('AI must return exactly 30 questions');
   }
 
   return questions.map((q, i) => {
@@ -124,6 +125,12 @@ function validateAndMapQuestions(payload) {
 
     const correctAnswer = normalizeCorrectAnswer(q?.answer, options);
 
+    const difficultyRaw = String(q?.difficulty || '').trim().toUpperCase();
+    let difficulty = 'MEDIUM'; // default
+    if (['EASY', 'MEDIUM', 'HARD'].includes(difficultyRaw)) {
+      difficulty = difficultyRaw;
+    }
+
     return {
       questionText,
       optionA: oA,
@@ -131,6 +138,7 @@ function validateAndMapQuestions(payload) {
       optionC: oC,
       optionD: oD,
       correctAnswer,
+      difficulty,
     };
   });
 }
@@ -162,7 +170,13 @@ export async function generateMcqsForDegree({ degreeName }) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    throw new Error(`Gemini API failed (${resp.status}): ${text || resp.statusText}`);
+    const message = `Gemini API failed (${resp.status}): ${text || resp.statusText}`;
+    if (resp.status === 403) {
+      throw new Error(
+        `${message} Please verify your GEMINI_API_KEY is valid and has access to the Gemini API.`
+      );
+    }
+    throw new Error(message);
   }
 
   const data = await resp.json();
