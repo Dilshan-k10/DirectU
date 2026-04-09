@@ -1,6 +1,29 @@
+/**
+ * Gemini AI Question Generation Service
+ *
+ * This module provides functionality to generate multiple-choice questions (MCQs)
+ * for university entrance exams using Google's Gemini AI model.
+ *
+ * Key functionalities:
+ * - Generates exactly 30 balanced MCQs per degree (40% easy, 40% medium, 20% hard)
+ * - Provides degree-specific guidance for appropriate question difficulty
+ * - Handles API communication with Gemini 2.5 Flash model
+ * - Validates and normalizes AI-generated content
+ * - Ensures consistent question format and answer validation
+ */
+
 const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+/**
+ * Builds degree-specific guidance for question generation.
+ *
+ * Provides contextual instructions based on the degree name to ensure
+ * questions are appropriate for entrance exam level rather than advanced university topics.
+ *
+ * @param {string} degreeName - Name of the degree program
+ * @returns {string} Guidance text for AI question generation
+ */
 function buildDegreeGuidance(degreeName) {
   const name = String(degreeName || '').toLowerCase();
 
@@ -22,8 +45,15 @@ function buildDegreeGuidance(degreeName) {
     'Focus on realistic, general entrance-exam questions related to the degree field. ' +
     'Avoid overly technical, specialized, or advanced university-level questions.'
   );
-}
-
+/**
+ * Constructs the complete prompt for Gemini AI to generate MCQs.
+ *
+ * Combines degree guidance with specific formatting requirements
+ * to ensure consistent, valid JSON output from the AI model.
+ *
+ * @param {string} degreeName - Name of the degree program
+ * @returns {string} Complete prompt text for AI generation
+ */
 function buildPrompt(degreeName) {
   const guidance = buildDegreeGuidance(degreeName);
 
@@ -50,8 +80,15 @@ function buildPrompt(degreeName) {
       2
     ),
   ].join('\n');
-}
-
+/**
+ * Removes markdown code fences from AI response text.
+ *
+ * Gemini may wrap JSON responses in ```json or ``` blocks,
+ * this function strips those markers to get clean JSON.
+ *
+ * @param {string} text - Raw text from AI response
+ * @returns {string} Text with code fences removed
+ */
 function stripCodeFences(text) {
   const s = String(text || '').trim();
   // Remove ```json ... ``` or ``` ... ```
@@ -59,8 +96,16 @@ function stripCodeFences(text) {
     return s.replace(/^```[a-zA-Z]*\s*/m, '').replace(/```$/m, '').trim();
   }
   return s;
-}
-
+/**
+ * Parses JSON response from Gemini AI.
+ *
+ * Handles potential extra text or formatting issues by attempting
+ * to extract the first valid JSON object from the response.
+ *
+ * @param {string} rawText - Raw response text from Gemini API
+ * @returns {Object} Parsed JSON object
+ * @throws {Error} If JSON parsing fails
+ */
 function parseGeminiJson(rawText) {
   const cleaned = stripCodeFences(rawText);
 
@@ -77,8 +122,17 @@ function parseGeminiJson(rawText) {
     }
     throw new Error('Invalid JSON returned by AI');
   }
-}
-
+/**
+ * Normalizes the correct answer from AI response to A, B, C, or D format.
+ *
+ * Handles various answer formats from AI (letter format, full text matching)
+ * and converts them to standardized letter format.
+ *
+ * @param {string} answerRaw - Raw answer text from AI
+ * @param {Array<string>} optionsRaw - Array of option texts
+ * @returns {string} Normalized answer letter (A, B, C, or D)
+ * @throws {Error} If answer cannot be matched to any option
+ */
 function normalizeCorrectAnswer(answerRaw, optionsRaw) {
   const answer = String(answerRaw || '').trim();
   const options = Array.isArray(optionsRaw) ? optionsRaw.map((o) => String(o || '').trim()) : [];
@@ -101,8 +155,17 @@ function normalizeCorrectAnswer(answerRaw, optionsRaw) {
   if (idx2 === 3) return 'D';
 
   throw new Error('AI answer does not match any option');
-}
-
+/**
+ * Validates and maps AI-generated questions to standardized format.
+ *
+ * Ensures all questions have required fields, exactly 4 options,
+ * and valid difficulty levels. Converts AI response format to
+ * database-compatible question objects.
+ *
+ * @param {Object} payload - Parsed JSON payload from AI
+ * @returns {Array<Object>} Array of validated question objects
+ * @throws {Error} If validation fails for any question
+ */
 function validateAndMapQuestions(payload) {
   const questions = payload?.questions;
   if (!Array.isArray(questions) || questions.length !== 30) {
@@ -141,8 +204,21 @@ function validateAndMapQuestions(payload) {
       difficulty,
     };
   });
-}
-
+/**
+ * Generates 30 multiple-choice questions for a degree using Gemini AI.
+ *
+ * Main entry point for question generation:
+ * - Validates API key configuration
+ * - Constructs appropriate prompt for the degree
+ * - Calls Gemini API with optimized parameters
+ * - Parses and validates the response
+ * - Returns standardized question objects ready for database insertion
+ *
+ * @param {Object} params - Parameters object
+ * @param {string} params.degreeName - Name of the degree program
+ * @returns {Promise<Array<Object>>} Promise resolving to array of 30 question objects
+ * @throws {Error} If API key is missing, API call fails, or response validation fails
+ */
 export async function generateMcqsForDegree({ degreeName }) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
@@ -150,6 +226,7 @@ export async function generateMcqsForDegree({ degreeName }) {
 
   const prompt = buildPrompt(degreeName);
 
+  // Call Gemini API with structured request for consistent JSON output
   const resp = await fetch(GEMINI_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -163,7 +240,7 @@ export async function generateMcqsForDegree({ degreeName }) {
         },
       ],
       generationConfig: {
-        temperature: 0.6,
+        temperature: 0.6, // Balanced creativity for question variety
       },
     }),
   });
@@ -180,11 +257,13 @@ export async function generateMcqsForDegree({ degreeName }) {
   }
 
   const data = await resp.json();
+  // Extract text content from Gemini's structured response format
   const text =
     data?.candidates?.[0]?.content?.parts?.map((p) => p?.text).filter(Boolean).join('\n') || '';
 
   if (!text) throw new Error('Gemini returned empty response');
 
+  // Parse and validate the AI-generated questions
   const parsed = parseGeminiJson(text);
   const mapped = validateAndMapQuestions(parsed);
   return mapped;

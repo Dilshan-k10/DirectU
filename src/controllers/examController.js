@@ -1,8 +1,40 @@
+/**
+ * Exam Controller
+ *
+ * This module handles all exam-related operations including fetching questions,
+ * submitting answers, calculating scores, and managing rankings for university entrance exams.
+ *
+ * Key functionalities:
+ * - Fetching randomized exam questions based on degree and application status
+ * - Submitting and validating student answers
+ * - Calculating final scores and updating test results
+ * - Recalculating degree rankings after score updates
+ * - Retrieving student rankings and sending notification emails
+ */
+
 import { prisma } from '../config/db.js';
 import { generateMcqsForDegree } from '../services/geminiQuestionService.js';
 import { updateDegreeRanking } from '../services/rankingService.js';
 import { sendEmail } from '../services/mailService.js';
 
+/**
+ * Fetches random exam questions for a specific degree.
+ *
+ * This function:
+ * - Verifies user authentication and application qualification
+ * - Checks for existing test results and prevents duplicate exams
+ * - Generates new questions using AI if needed, or falls back to existing question pool
+ * - Assigns questions to the student in a randomized order
+ * - Ensures balanced difficulty distribution (40% easy, 40% medium, 20% hard)
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Request parameters
+ * @param {string} req.params.degreeId - The ID of the degree for the exam
+ * @param {Object} req.user - Authenticated user object
+ * @param {string} req.user.id - ID of the logged-in user
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with exam questions or error message
+ */
 const getRandomQuestionsByDegree = async (req, res) => {
   try {
     const { degreeId } = req.params;
@@ -138,10 +170,11 @@ const getRandomQuestionsByDegree = async (req, res) => {
       }
     }
 
-    const generationAttempts = Math.floor(lastNumber / 30);
+    let generationAttempts = Math.floor(lastNumber / 30);
     let generationError = null;
     let newlyGeneratedQuestions = [];
 
+    // Attempt to generate new questions using AI, with a limit of 10 attempts (300 questions max per degree)
     if (generationAttempts < 10) {
       try {
         const generated = await generateMcqsForDegree({ degreeName: degree.name });
@@ -214,7 +247,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
         });
       }
 
-      // Group questions by difficulty
+      // Group questions by difficulty to ensure balanced distribution
       const grouped = { EASY: [], MEDIUM: [], HARD: [] };
       for (const q of pool) {
         const diff = q.difficulty || 'MEDIUM'; // fallback for old questions
@@ -229,13 +262,13 @@ const getRandomQuestionsByDegree = async (req, res) => {
       const targetCounts = { EASY: 12, MEDIUM: 12, HARD: 6 };
       const selected = [];
 
-      // For each difficulty, shuffle and take up to target
+      // For each difficulty, shuffle and take up to target count
       for (const [diff, questions] of Object.entries(grouped)) {
         const target = targetCounts[diff] || 0;
         if (questions.length <= target) {
           selected.push(...questions);
         } else {
-          // Shuffle and take target
+          // Shuffle array using Fisher-Yates algorithm and take first 'target' questions
           for (let i = questions.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [questions[i], questions[j]] = [questions[j], questions[i]];
@@ -291,8 +324,26 @@ const getRandomQuestionsByDegree = async (req, res) => {
       data: null,
     });
   }
-};
-
+/**
+ * Submits student answers for an exam.
+ *
+ * This function:
+ * - Validates input data (studentId, degreeId, answers array)
+ * - Verifies student and degree existence
+ * - Normalizes and validates answer format (A, B, C, D)
+ * - Checks for duplicate question IDs
+ * - Retrieves correct answers from database
+ * - Saves answers with correctness status using database transactions
+ * - Marks the test result as completed
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.studentId - ID of the student submitting answers
+ * @param {string} req.body.degreeId - ID of the degree/program
+ * @param {Array} req.body.answers - Array of answer objects with questionId and selectedAnswer
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response confirming submission or error message
+ */
 const submitStudentAnswers = async (req, res) => {
   try {
     const { studentId, degreeId, answers } = req.body;
@@ -495,8 +546,24 @@ const submitStudentAnswers = async (req, res) => {
       },
     });
   }
-};
-
+/**
+ * Calculates and saves the final score for a completed exam.
+ *
+ * This function:
+ * - Validates student and degree existence
+ * - Retrieves all submitted answers for the test
+ * - Counts correct answers (each correct answer = 10 points)
+ * - Updates the test result with the calculated score
+ * - Sends a notification email to the student with their score
+ * - Triggers degree ranking recalculation
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.studentId - ID of the student
+ * @param {string} req.body.degreeId - ID of the degree/program
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with final score or error message
+ */
 const calculateFinalScoreAndSave = async (req, res) => {
   try {
     const { studentId, degreeId } = req.body;
@@ -635,8 +702,20 @@ const calculateFinalScoreAndSave = async (req, res) => {
       data: null,
     });
   }
-};
-
+/**
+ * Recalculates rankings for all students in a specific degree.
+ *
+ * This function:
+ * - Validates the degree ID parameter
+ * - Triggers the ranking service to update rankings based on current scores
+ * - Used for manual recalculation when needed
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Request parameters
+ * @param {string} req.params.degreeId - ID of the degree to recalculate rankings for
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response confirming recalculation or error message
+ */
 const recalculateDegreeRankings = async (req, res) => {
   try {
     const { degreeId } = req.params;
@@ -663,9 +742,22 @@ const recalculateDegreeRankings = async (req, res) => {
       data: null,
     });
   }
-};
-
-
+/**
+ * Retrieves student rankings for degrees and sends notification emails.
+ *
+ * This function:
+ * - Fetches rankings from the database, optionally filtered by degree
+ * - Formats ranking data for response
+ * - Sends congratulatory emails to top 2 ranked students per degree
+ * - Sends update emails to non-selected students
+ * - Handles email sending asynchronously to avoid blocking the response
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} req.query - Query parameters
+ * @param {string} [req.query.degreeId] - Optional degree ID to filter rankings
+ * @param {Object} res - Express response object
+ * @returns {Object} JSON response with ranking data or error message
+ */
 const getStudentRankings = async (req, res) => {
   try {
     const { degreeId } = req.query || {};
@@ -721,6 +813,7 @@ const getStudentRankings = async (req, res) => {
 
     
     try {
+      // Group rankings by degree for efficient email processing
       const byDegree = new Map();
       for (const row of rankings) {
         const did = row.degreeId;
@@ -728,6 +821,7 @@ const getStudentRankings = async (req, res) => {
         byDegree.get(did).push(row);
       }
 
+      // Send personalized emails to all students based on their ranking
       const emailOps = [];
       for (const [did, rows] of byDegree.entries()) {
         const degreeName = rows?.[0]?.application?.program?.name || did;
@@ -735,6 +829,7 @@ const getStudentRankings = async (req, res) => {
           const email = r?.application?.candidate?.email;
           if (!email) continue;
 
+          // Top 2 students are selected, others receive update emails
           const selected = typeof r.rank === 'number' ? r.rank <= 2 : false;
           const subject = selected ? 'Congratulations!' : 'Application Update';
           const message = selected
