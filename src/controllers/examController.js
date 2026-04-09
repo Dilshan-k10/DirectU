@@ -137,7 +137,7 @@ const getRandomQuestionsByDegree = async (req, res) => {
       },
     });
 
-    if (existingAssignments.length === 30) {
+    if (existingAssignments.length === 60) {
       return res.status(403).json({
         success: false,
         message: 'You already sat for this exam. You cannot sit for another exam.',
@@ -659,7 +659,7 @@ const calculateFinalScoreAndSave = async (req, res) => {
       }
     }
 
-    const totalScore = correctCount * 10;
+    const totalScore = (correctCount / 30) * 100;
 
     
     const updatedResult = await prisma.testResult.update({
