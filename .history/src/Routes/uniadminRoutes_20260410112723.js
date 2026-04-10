@@ -28,14 +28,15 @@ router.get('/analysisResults/:applicationId', protect, authorize('ADMIN', 'USER'
 
 router.get('/analysisFeedback/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisFeedbackById);
 router.get('/applicants/:applicationId/exam', protect, authorize('ADMIN', 'USER'), getApplicantExamDetail);
-router.get('/applicants/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantDetail);
+
 
 // All routes below require ADMIN role
 router.use(protect, authorize('ADMIN'));
 
 router.get('/dashboard', getDashboard);
 router.get('/applicants', getApplicants);
-
+router.get('/applicants/:applicationId', getApplicantDetail);
+router.get('/applicants/:applicationId/exam', getApplicantExamDetail);
 router.post('/intakes', createIntake);
 router.put('/intakes/:intakeId', updateIntake);
 router.post('/degrees', createDegree);
