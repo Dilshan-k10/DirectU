@@ -28,7 +28,7 @@ router.get('/analysisResults/:applicationId', protect, authorize('ADMIN', 'USER'
 
 router.get('/analysisFeedback/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantanalysisFeedbackById);
 router.get('/applicants/:applicationId/exam', protect, authorize('ADMIN', 'USER'), getApplicantExamDetail);
-router.get('/applicants/:applicationId', protect, authorize('ADMIN', 'USER'), getApplicantDetail);
+router.get('/applicants/:applicationId', getApplicantDetail);
 
 // All routes below require ADMIN role
 router.use(protect, authorize('ADMIN'));
