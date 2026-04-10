@@ -29,17 +29,17 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
-// ADMIN only - get all applications
+// ADMIN and USER 
 router.get(
   "/all/applications",
   protect,
-  authorize("ADMIN"),
+  authorize('ADMIN', 'USER'),
   getAllApplications,
 );
 
-router.get("/search", protect, authorize("ADMIN"), getApplicationById);
+router.get("/search", protect, authorize('ADMIN', 'USER'), getApplicationById);
 
-router.get("/view/:id", protect, authorize("ADMIN"), viewDocument);
+router.get("/view/:id", protect, authorize('ADMIN', 'USER'), viewDocument);
 
 // USER routes
 router.post(
